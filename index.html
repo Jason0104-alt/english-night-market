@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>英語夜市｜English Night Market</title>
+<style>
+  html,body { height:100%; margin:0; background:#0b0f1a; }
+  canvas { display:block; width:100vw; height:100vh; outline:none; }
+</style>
+</head>
+<body>
+<canvas id="app" tabindex="0"></canvas>
+<script>
+(() => {
+  // ====== Config & Utilities ==================================================
+  const CANVAS = document.getElementById('app');
+  const CTX = CANVAS.getContext('2d');
+
+  const DPR = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+  function resize() {
+    CANVAS.width  = Math.floor(window.innerWidth * DPR);
+    CANVAS.height = Math.floor(window.innerHeight * DPR);
+    CANVAS.style.width  = window.innerWidth + 'px';
+    CANVAS.style.height = window.innerHeight + 'px';
+  }
+  window.addEventListener('resize', resize);
+
+  const TODAY = () => new Date().toISOString().slice(0,10); // YYYY-MM-DD
+  const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
+  const rand = (a,b)=>Math.random()*(b-a)+a;
+  const lerp = (a,b,t)=>a+(b-a)*t;
+
+  // Colors (Night Market vibe)
+  const COL = {
+    bgTop:    '#0b0f1a',
+    bgBot:    '#1a2236',
+    jade:     '#1cc2a0',
+    red:      '#ff3b30',
+    lantern:  '#ff934d',
+    gold:     '#ffcf59',
+    ink:      '#101422',
+    ink2:     '#172036',
+    card:     '#11203a',
+    line:     'rgba(255,255,255,0.15)',
+    white:    '#ffffff',
+    faint:    'rgba(255,255,255,0.6)',
+    dim:      'rgba(255,255,255,0.35)',
+    green:    '#23d18b',
+    blue:     '#38a1ff',
+    pink:     '#ff5fa2',
+    purple:   '#8a7dff',
+  };
+
+  // Local storage profile
+  const STORE_KEY = 'nightmarket_english_profile_v1';
+  function loadProfile() {
+    try {
+      const d = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+      if (!d.createdAt) d.createdAt = TODAY();
+      if (!d.daily) d.daily = {};
+      if (!d.learnedWords) d.learnedWords = [];
+      if (!d.xp) d.xp = 0;
+      if (!d.streak) d.streak = 0;
+      if (!d.lastDate) d.lastDate = '';
+      if (!d.highScore) d.highScore = 0;
+      ensureStreak(d);
+      return d;
+    } catch(e) {
+      return { createdAt:TODAY(), daily:{}, learnedWords:[], xp:0, streak:0, lastDate:'', highScore:0 };
+    }
+  }
+  function ensureStreak(p){
+    const today = TODAY();
+    if (p.lastDate !== today) {
+      // compute streak
+      const prev = p.lastDate;
+      const yday = new Date(); yday.setDate(yday.getDate()-1);
+      const ystr = yday.toISOString().slice(0,10);
+      p.streak = (prev === ystr) ? (p.streak||0)+1 : 1;
+      p.lastDate = today;
+      if (!p.daily[today]) p.daily[today] = { xp:0, words:0, games:0 };
+      saveProfile();
+    }
+  }
+  function saveProfile(){ localStorage.setItem(STORE_KEY, JSON.stringify(profile)); }
+
+  let profile = loadProfile();
+
+  // ====== Word list ===========================================================
+  // Simple curated starter deck (en → zh). You can expand freely.
+  const WORDS = [
+    {en:'apple', zh:'蘋果'}, {en:'bread', zh:'麵包'}, {en:'milk', zh:'牛奶'}, {en:'rice', zh:'米飯'},
+    {en:'vegetable', zh:'蔬菜'}, {en:'fruit', zh:'水果'}, {en:'egg', zh:'雞蛋'},{en:'chicken', zh:'雞肉'},
+    {en:'beef', zh:'牛肉'},{en:'fish', zh:'魚'},{en:'noodle', zh:'麵'},{en:'water', zh:'水'},
+    {en:'tea', zh:'茶'},{en:'coffee', zh:'咖啡'},{en:'salt', zh:'鹽'},{en:'sugar', zh:'糖'},
+    {en:'spoon', zh:'湯匙'},{en:'chopsticks', zh:'筷子'},{en:'bowl', zh:'碗'},{en:'plate', zh:'盤子'},
+    {en:'market', zh:'市場'},{en:'grandma', zh:'阿嬤'},{en:'bag', zh:'袋子'},{en:'carrot', zh:'紅蘿蔔'},
+    {en:'tomato', zh:'番茄'},{en:'banana', zh:'香蕉'},{en:'grape', zh:'葡萄'},{en:'eggplant', zh:'茄子'},
+    {en:'onion', zh:'洋蔥'},{en:'garlic', zh:'大蒜'},{en:'pepper', zh:'胡椒'},{en:'ginger', zh:'薑'},
+    {en:'shop', zh:'商店'},{en:'cashier', zh:'收銀員'},{en:'discount', zh:'折扣'},{en:'fresh', zh:'新鮮的'},
+    {en:'delicious', zh:'美味的'},{en:'healthy', zh:'健康的'},{en:'hungry', zh:'餓的'},{en:'thirsty', zh:'渴的'},
+    {en:'morning', zh:'早上'},{en:'evening', zh:'晚上'},{en:'today', zh:'今天'},{en:'tomorrow', zh:'明天'},
+    {en:'practice', zh:'練習'},{en:'listen', zh:'聽'},{en:'speak', zh:'說'},{en:'repeat', zh:'重複'},
+    {en:'left', zh:'左邊'},{en:'right', zh:'右邊'},{en:'up', zh:'上'},{en:'down', zh:'下'}
+  ];
+  let wordIndex = 0;
+  function nextWord() {
+    const w = WORDS[wordIndex % WORDS.length]; wordIndex++;
+    return w;
+  }
+
+  // ====== Speech (voice-over) ================================================
+  function speakWord(enWord) {
+    try {
+      const u = new SpeechSynthesisUtterance(enWord);
+      u.lang = 'en-US';
+      u.rate = 0.95;
+      u.pitch = 1.0;
+      // Prefer an English voice if available
+      const voices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+      const v = voices.find(v=>/en(-|_)?(US|GB)/i.test(v.lang)) || voices[0];
+      if (v) u.voice = v;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    } catch(e) { /* fail silently */ }
+  }
+
+  // ====== Scene management ====================================================
+  const SCREENS = { MENU:'menu', DASH:'dash', FLASH:'flash', QUIZ:'quiz', SNAKE:'snake' };
+  let screen = SCREENS.MENU;
+  let hoverId = null;
+
+  // ====== UI primitives on Canvas ============================================
+  function drawBg() {
+    const {width:w,height:h} = CANVAS;
+    const g = CTX.createLinearGradient(0,0,0,h);
+    g.addColorStop(0, COL.bgTop);
+    g.addColorStop(1, COL.bgBot);
+    CTX.fillStyle = g; CTX.fillRect(0,0,w,h);
+
+    // Lantern strings
+    const rows = 4, cols = 10;
+    for (let r=0;r<rows;r++){
+      const y = (h*0.12) + r*(h*0.12);
+      CTX.strokeStyle = COL.line; CTX.lineWidth = 2*DPR;
+      CTX.beginPath(); CTX.moveTo(w*0.05,y); CTX.quadraticCurveTo(w*0.5,y + (r%2?20:-20)*DPR, w*0.95, y); CTX.stroke();
+      for (let c=0;c<cols;c++){
+        const t = c/(cols-1);
+        const x = lerp(w*0.05, w*0.95, t);
+        drawLantern(x,y + (r%2?12:-12)*DPR, (r%2?1:0));
+      }
+    }
+  }
+  function drawLantern(x,y,alt=0){
+    CTX.save();
+    CTX.translate(x,y);
+    CTX.fillStyle = alt?COL.gold:COL.lantern;
+    roundedRect(-16*DPR,-12*DPR,32*DPR,24*DPR,8*DPR);
+    CTX.fill();
+    CTX.fillStyle = 'rgba(0,0,0,0.2)';
+    roundedRect(-16*DPR,-12*DPR,32*DPR,24*DPR,8*DPR);
+    CTX.strokeStyle='rgba(255,255,255,0.15)'; CTX.stroke();
+
+    // knot
+    CTX.fillStyle = COL.red;
+    CTX.fillRect(-4*DPR,12*DPR,8*DPR,6*DPR);
+    CTX.restore();
+  }
+  function roundedRect(x,y,w,h,r){
+    CTX.beginPath();
+    CTX.moveTo(x+r,y);
+    CTX.arcTo(x+w,y,x+w,y+h,r);
+    CTX.arcTo(x+w,y+h,x,y+h,r);
+    CTX.arcTo(x,y+h,x,y,r);
+    CTX.arcTo(x,y,x+w,y,r);
+    CTX.closePath();
+  }
+  function drawTitle(){
+    const {width:w} = CANVAS;
+    CTX.font = `${32*DPR}px sans-serif`;
+    CTX.fillStyle = COL.white;
+    CTX.textAlign = 'center';
+    CTX.fillText('英語夜市 · English Night Market', w/2, 60*DPR);
+    CTX.font = `${16*DPR}px sans-serif`;
+    CTX.fillStyle = COL.faint;
+    CTX.fillText('學英文 · 玩遊戲 · 每日進步', w/2, 90*DPR);
+  }
+  function btnRect(cx, cy, w, h){ return {x:cx-w/2, y:cy-h/2, w, h}; }
+  function drawButton(id, rect, label, sublabel=null) {
+    const isHover = hoverId===id;
+    CTX.save();
+    CTX.translate(rect.x, rect.y);
+    const r = 16*DPR;
+    CTX.globalAlpha = isHover?1:0.95;
+    CTX.fillStyle = isHover?COL.jade:COL.card;
+    roundedRect(0,0,rect.w,rect.h,r); CTX.fill();
+    CTX.lineWidth = 2*DPR; CTX.strokeStyle = COL.line; CTX.stroke();
+    CTX.fillStyle = isHover?COL.ink:COL.white;
+    CTX.textAlign = 'center';
+    CTX.font = `${18*DPR}px sans-serif`;
+    CTX.fillText(label, rect.w/2, rect.h/2 - (sublabel?6*DPR:0));
+    if (sublabel){
+      CTX.font = `${12*DPR}px sans-serif`;
+      CTX.fillStyle = isHover?COL.ink:'rgba(255,255,255,0.75)';
+      CTX.fillText(sublabel, rect.w/2, rect.h/2 + 14*DPR);
+    }
+    CTX.restore();
+  }
+  function drawStatPill(x,y,label,value,color){
+    CTX.save();
+    CTX.translate(x,y);
+    const pad = 10*DPR;
+    const text = `${label}: ${value}`;
+    CTX.font = `${12*DPR}px sans-serif`;
+    const m = CTX.measureText(text);
+    const w = m.width + pad*2, h = 24*DPR;
+    CTX.fillStyle = 'rgba(0,0,0,0.35)';
+    roundedRect(0,0,w,h,12*DPR); CTX.fill();
+    CTX.strokeStyle = color; CTX.lineWidth = 2*DPR; CTX.stroke();
+    CTX.fillStyle = COL.white;
+    CTX.textAlign = 'center';
+    CTX.fillText(text, w/2, h/2 + 4*DPR);
+    CTX.restore();
+  }
+  function drawProgressRing(cx, cy, r, pct, label){
+    CTX.save();
+    CTX.translate(cx,cy);
+    CTX.lineWidth = 10*DPR;
+    CTX.strokeStyle = 'rgba(255,255,255,0.15)';
+    CTX.beginPath(); CTX.arc(0,0,r,0,Math.PI*2); CTX.stroke();
+    CTX.strokeStyle = COL.jade;
+    CTX.beginPath(); CTX.arc(0,0,r,-Math.PI/2, -Math.PI/2 + pct*2*Math.PI); CTX.stroke();
+    CTX.fillStyle = COL.white; CTX.textAlign='center';
+    CTX.font = `${16*DPR}px sans-serif`;
+    CTX.fillText(label,0,6*DPR);
+    CTX.restore();
+  }
+
+  // ====== Dashboard ===========================================================
+  function drawTopBar(){
+    const w = CANVAS.width, h = CANVAS.height;
+    // Today stats
+    const day = profile.daily[TODAY()] || {xp:0,words:0,games:0};
+    drawStatPill(w*0.07, h*0.08, 'Streak 連續天數', profile.streak, COL.gold);
+    drawStatPill(w*0.25, h*0.08, 'XP 今日經驗', day.xp||0, COL.green);
+    drawStatPill(w*0.41, h*0.08, 'Words 單字', day.words||0, COL.blue);
+    drawStatPill(w*0.57, h*0.08, 'High Score 遊戲高分', profile.highScore||0, COL.pink);
+  }
+
+  // ====== MENU Screen ========================================================
+  const buttons = {};
+  function drawMenu(){
+    drawBg(); drawTitle(); drawTopBar();
+    const w = CANVAS.width, h = CANVAS.height;
+    const B = [
+      {id:'toDash',   y: h*0.28, label:'📊 進度儀表板 Dashboard', sub:'每日目標 · 單字完成度'},
+      {id:'toFlash',  y: h*0.40, label:'🃏 單字閃卡 Flashcards',    sub:'翻轉卡片 · 認知加強'},
+      {id:'toQuiz',   y: h*0.52, label:'📝 測驗 Quizzes',           sub:'選擇題 · 即時得分'},
+      {id:'toSnake',  y: h*0.64, label:'🛒 阿嬤買菜遊戲 (Snake)',     sub:'方向鍵操控 · 撿到就發音'},
+    ];
+    const rectW = Math.min(w*0.7, 740*DPR), rectH = 68*DPR;
+    B.forEach((b,i)=>{
+      const rect = btnRect(w/2, b.y, rectW, rectH);
+      buttons[b.id] = rect;
+      drawButton(b.id, rect, b.label, b.sub);
+    });
+    // Progress ring
+    const today = profile.daily[TODAY()] || {xp:0};
+    const pct = clamp((today.xp||0)/100,0,1);
+    drawProgressRing(w*0.85, h*0.25, 48*DPR, pct, `今日XP ${today.xp||0}/100`);
+  }
+
+  // ====== DASH Screen =========================================================
+  function drawDash(){
+    drawBg(); drawTitle(); drawTopBar();
+    const w = CANVAS.width, h = CANVAS.height;
+
+    // Cards for summaries
+    function card(x,y,ww,hh, title, lines) {
+      CTX.save();
+      CTX.translate(x,y);
+      CTX.fillStyle = COL.card;
+      roundedRect(0,0,ww,hh,18*DPR); CTX.fill();
+      CTX.strokeStyle = COL.line; CTX.lineWidth = 2*DPR; CTX.stroke();
+      CTX.fillStyle = COL.white; CTX.textAlign = 'left';
+      CTX.font = `${16*DPR}px sans-serif`;
+      CTX.fillText(title, 20*DPR, 34*DPR);
+      CTX.font = `${13*DPR}px sans-serif`;
+      CTX.fillStyle = COL.faint;
+      lines.forEach((ln,i)=> CTX.fillText(ln, 20*DPR, 60*DPR + i*20*DPR));
+      CTX.restore();
+    }
+
+    const today = profile.daily[TODAY()] || {xp:0,words:0,games:0};
+    card(w*0.15, h*0.25, w*0.30, h*0.30,
+      '今日任務',
+      [
+        `完成 30 XP：${today.xp>=30?'✅ 完成':'⬜ 進行中'}`,
+        `學 10 字：${today.words>=10?'✅ 完成':`⬜ ${today.words||0}/10`}`,
+        `玩阿嬤買菜 1 局：${today.games>=1?'✅ 完成':'⬜ 尚未'}`
+      ]
+    );
+    card(w*0.55, h*0.25, w*0.30, h*0.30,
+      '總覽',
+      [
+        `註冊日期：${profile.createdAt}`,
+        `累積 XP：${profile.xp}`,
+        `已學單字：${profile.learnedWords.length}`
+      ]
+    );
+
+    // Buttons
+    const rectW = Math.min(w*0.7, 740*DPR), rectH = 60*DPR, y0 = h*0.66;
+    [
+      {id:'backMenu',    y: y0, label:'← 返回目錄 Menu'},
+      {id:'toFlash',     y: y0+80*DPR, label:'🃏 開始閃卡'},
+      {id:'toQuiz',      y: y0+160*DPR,label:'📝 開始測驗'},
+      {id:'toSnake',     y: y0+240*DPR,label:'🛒 開始阿嬤買菜'}
+    ].forEach(b=>{
+      const rect = btnRect(w/2, b.y, rectW, rectH);
+      buttons[b.id]=rect; drawButton(b.id, rect, b.label);
+    });
+  }
+
+  // ====== FLASHCARDS ==========================================================
+  let flash = {
+    deck: shuffle([...WORDS]),
+    showBack:false,
+    current: null,
+    lastFlip: 0,
+  };
+  function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j= (Math.random()* (i+1))|0; [a[i],a[j]]=[a[j],a[i]]; } return a; }
+  function drawFlash(){
+    drawBg(); drawTitle(); drawTopBar();
+    const w = CANVAS.width, h = CANVAS.height;
+    if (!flash.current) flash.current = flash.deck[0];
+
+    // Card
+    const cw = Math.min(520*DPR, w*0.8), ch = Math.min(320*DPR, h*0.5);
+    const cx = w/2 - cw/2, cy = h*0.3;
+    CTX.save();
+    CTX.translate(cx, cy);
+    CTX.fillStyle = COL.card;
+    roundedRect(0,0,cw,ch,24*DPR); CTX.fill();
+    CTX.strokeStyle = COL.line; CTX.lineWidth = 2*DPR; CTX.stroke();
+    CTX.textAlign='center';
+    if (!flash.showBack){
+      CTX.fillStyle = COL.white; CTX.font = `${32*DPR}px sans-serif`;
+      CTX.fillText(flash.current.en, cw/2, ch/2);
+      CTX.fillStyle = COL.dim; CTX.font = `${14*DPR}px sans-serif`;
+      CTX.fillText('點擊卡片翻面 Flip card', cw/2, ch-20*DPR);
+    } else {
+      CTX.fillStyle = COL.jade; CTX.font = `${28*DPR}px sans-serif`;
+      CTX.fillText(flash.current.zh, cw/2, ch/2 - 8*DPR);
+      CTX.fillStyle = COL.faint; CTX.font = `${16*DPR}px sans-serif`;
+      CTX.fillText(flash.current.en, cw/2, ch/2 + 24*DPR);
+    }
+    CTX.restore();
+
+    // Buttons
+    const bw = Math.min(660*DPR,w*0.9), bh = 56*DPR, y = cy+ch+80*DPR;
+    const b1 = btnRect(w/2, y, bw, bh);
+    const b2 = btnRect(w/2, y+80*DPR, bw, bh);
+    const b3 = btnRect(w/2, y+160*DPR, bw, bh);
+    buttons['flashFlip']=b1; buttons['flashKnow']=b2; buttons['flashPractice']=b3;
+    drawButton('flashFlip', b1, '🔄 翻面 / Flip');
+    drawButton('flashKnow', b2, '✅ 我會了 / I knew it');
+    drawButton('flashPractice', b3, '🧠 需要多練 / Need practice');
+    const back = btnRect(w*0.15, h*0.9, 220*DPR, 50*DPR);
+    buttons['backMenu']=back; drawButton('backMenu', back, '← 返回 Menu');
+  }
+  function flashFlip(){ flash.showBack = !flash.showBack; }
+  function flashAdvance(known){
+    if (known) grantXP(5);
+    else grantXP(3);
+    const cur = flash.current;
+    if (known && !profile.learnedWords.includes(cur.en)){
+      profile.learnedWords.push(cur.en);
+      incToday('words',1);
+    }
+    // next
+    flash.deck.push(flash.deck.shift());
+    flash.current = flash.deck[0];
+    flash.showBack=false;
+    saveProfile();
+  }
+
+  // ====== QUIZ ================================================================
+  let quiz = { q:null, options:[], correct:0, total:0, feedback:'' };
+  function genQuiz(){
+    const base = nextWord();
+    const wrongs = shuffle([...WORDS].filter(w=>w.en!==base.en)).slice(0,3);
+    const options = shuffle([base, ...wrongs]);
+    quiz.q = base; quiz.options = options;
+  }
+  function drawQuiz(){
+    drawBg(); drawTitle(); drawTopBar();
+    const w = CANVAS.width, h = CANVAS.height;
+    if (!quiz.q) genQuiz();
+    CTX.textAlign='center';
+    // Card prompt
+    const cw = Math.min(520*DPR,w*0.8), ch = 140*DPR;
+    const cx = w/2 - cw/2, cy = h*0.25;
+    CTX.save();
+    CTX.translate(cx, cy);
+    CTX.fillStyle = COL.card; roundedRect(0,0,cw,ch,20*DPR); CTX.fill();
+    CTX.strokeStyle = COL.line; CTX.lineWidth = 2*DPR; CTX.stroke();
+    CTX.fillStyle = COL.white; CTX.font = `${28*DPR}px sans-serif`;
+    CTX.fillText(`請選出「${quiz.q.en}」的中文意思`, cw/2, ch/2 + 8*DPR);
+    CTX.restore();
+
+    // Options
+    const bw = Math.min(660*DPR, w*0.9), bh = 56*DPR, y0 = cy+ch+60*DPR;
+    quiz.options.forEach((opt,i)=>{
+      const r = btnRect(w/2, y0 + i*80*DPR, bw, bh);
+      const id = 'quizOpt'+i; buttons[id]=r;
+      drawButton(id, r, `${i+1}. ${opt.zh}`);
+    });
+
+    // Footer
+    CTX.fillStyle = COL.faint; CTX.font = `${14*DPR}px sans-serif`;
+    CTX.fillText(`得分 ${quiz.correct}/${quiz.total}`, w/2, h*0.85);
+
+    const back = btnRect(w*0.15, h*0.9, 220*DPR, 50*DPR);
+    buttons['backMenu']=back; drawButton('backMenu', back, '← 返回 Menu');
+
+    if (quiz.feedback){
+      CTX.fillStyle = quiz.feedback.startsWith('✅')?COL.jade:COL.red;
+      CTX.font = `${18*DPR}px sans-serif`;
+      CTX.fillText(quiz.feedback, w/2, h*0.8);
+    }
+  }
+  function quizChoose(idx){
+    quiz.total++;
+    const pick = quiz.options[idx];
+    if (pick.en === quiz.q.en){
+      quiz.correct++; quiz.feedback = '✅ 正確！+10 XP';
+      grantXP(10);
+      if (!profile.learnedWords.includes(pick.en)){
+        profile.learnedWords.push(pick.en);
+        incToday('words',1);
+      }
+    } else {
+      quiz.feedback = `❌ 錯誤，正解是「${quiz.q.zh}」`;
+      grantXP(1);
+    }
+    saveProfile();
+    setTimeout(()=>{ quiz.feedback=''; genQuiz(); draw(); }, 700);
+  }
+
+  // ====== GRANDMA SNAKE GAME ==================================================
+  const GRID = { cols: 26, rows: 18, size: 28 }; // base logical grid
+  let game = null;
+
+  function startGame(){
+    // Fit grid to canvas dynamically
+    const cell = Math.floor(Math.min(CANVAS.width/(GRID.cols+6), CANVAS.height/(GRID.rows+6)));
+    const size = Math.max(18*DPR, cell);
+    const cols = Math.floor(CANVAS.width/size)-4;
+    const rows = Math.floor(CANVAS.height/size)-6;
+    game = {
+      size, cols, rows,
+      ox: Math.floor((CANVAS.width - cols*size)/2),
+      oy: Math.floor((CANVAS.height - rows*size)/2)+20*DPR,
+      dir: {x:1,y:0},
+      nextDir: {x:1,y:0},
+      snake: [],
+      grocery: null,
+      tickMs: 120,
+      elapsed: 0,
+      lastTick: performance.now(),
+      alive: true,
+      score: 0,
+      wordOnPickup: null,
+      started: false,
+      paused: false
+    };
+    const x0 = Math.floor(cols/3), y0 = Math.floor(rows/2);
+    game.snake = [{x:x0,y:y0},{x:x0-1,y:y0},{x:x0-2,y:y0}];
+    game.grocery = spawnGrocery();
+    incToday('games',0); // ensure today object exists
+  }
+
+  function drawSnake(){
+    drawBg(); drawTitle(); drawTopBar();
+    if (!game) startGame();
+
+    // Board
+    CTX.save();
+    CTX.translate(game.ox, game.oy);
+    // grid background
+    CTX.fillStyle = COL.ink2;
+    roundedRect(0,0,game.cols*game.size,game.rows*game.size,16*DPR); CTX.fill();
+
+    // grid lines
+    CTX.strokeStyle='rgba(255,255,255,0.06)'; CTX.lineWidth=1*DPR;
+    CTX.beginPath();
+    for (let c=1;c<game.cols;c++){ const x=c*game.size; CTX.moveTo(x,0); CTX.lineTo(x,game.rows*game.size); }
+    for (let r=1;r<game.rows;r++){ const y=r*game.size; CTX.moveTo(0,y); CTX.lineTo(game.cols*game.size,y); }
+    CTX.stroke();
+
+    // Grocery
+    if (game.grocery) drawGrocery(game.grocery.x, game.grocery.y);
+
+    // Snake body (shopping carts), head = grandma
+    for (let i=game.snake.length-1; i>=0; i--){
+      const seg = game.snake[i];
+      if (i===0) drawGrandma(seg.x, seg.y, game.dir);
+      else drawCart(seg.x, seg.y, i);
+    }
+
+    // HUD
+    CTX.restore();
+    const w = CANVAS.width, h = CANVAS.height;
+    CTX.fillStyle = COL.white; CTX.textAlign='center';
+    CTX.font = `${18*DPR}px sans-serif`;
+    CTX.fillText(`分數 Score: ${game.score}`, w/2, game.oy - 16*DPR);
+
+    if (!game.started){
+      CTX.fillStyle = COL.faint; CTX.font=`${16*DPR}px sans-serif`;
+      CTX.fillText('按下方向鍵開始 · Use arrow keys to start', w/2, game.oy + game.rows*game.size + 26*DPR);
+    } else if (game.paused){
+      CTX.fillStyle = COL.faint; CTX.font=`${16*DPR}px sans-serif`;
+      CTX.fillText('暫停中 · Press P to resume', w/2, game.oy + game.rows*game.size + 26*DPR);
+    } else {
+      CTX.fillStyle = COL.dim; CTX.font=`${12*DPR}px sans-serif`;
+      CTX.fillText('P = 暫停/繼續  R = 重來  M = Menu', w/2, game.oy + game.rows*game.size + 24*DPR);
+    }
+
+    if (game.wordOnPickup){
+      // Floating word overlay
+      CTX.fillStyle = COL.jade;
+      CTX.font = `${22*DPR}px sans-serif`;
+      CTX.fillText(`+ ${game.wordOnPickup.en} (${game.wordOnPickup.zh})`, w/2, game.oy - 40*DPR);
+    }
+  }
+
+  function drawGrandma(gx,gy,dir){
+    const s = game.size, x = gx*s, y = gy*s;
+    // Head (grandma face)
+    CTX.save(); CTX.translate(x,y);
+    // body background
+    CTX.fillStyle = '#7c8ba1';
+    roundedRect(2,2,s-4,s-4,8*DPR); CTX.fill();
+
+    // face circle
+    CTX.save();
+    CTX.translate(s/2, s/2);
+    CTX.fillStyle = '#ffd9c2';
+    CTX.beginPath(); CTX.arc(0,0, s*0.28, 0, Math.PI*2); CTX.fill();
+    // hair bun + gray hair
+    CTX.fillStyle = '#a7b0bd';
+    CTX.beginPath(); CTX.arc(0, -s*0.22, s*0.10, 0, Math.PI*2); CTX.fill();
+    CTX.beginPath(); CTX.arc(0, 0, s*0.30, Math.PI*0.7, Math.PI*0.3, true); CTX.strokeStyle='#9aa6b2'; CTX.lineWidth=4*DPR; CTX.stroke();
+
+    // eyes & smile
+    CTX.fillStyle = '#3a3a3a';
+    const ex = s*0.10, ey = -s*0.02;
+    CTX.beginPath(); CTX.arc(-ex, ey, 2.5*DPR, 0, Math.PI*2); CTX.fill();
+    CTX.beginPath(); CTX.arc( ex, ey, 2.5*DPR, 0, Math.PI*2); CTX.fill();
+    CTX.strokeStyle = '#c05b6e'; CTX.lineWidth = 2.2*DPR;
+    CTX.beginPath(); CTX.arc(0, s*0.06, s*0.10, 0, Math.PI); CTX.stroke();
+    CTX.restore();
+
+    // direction hint (tiny arrow on dress)
+    CTX.strokeStyle = 'rgba(255,255,255,0.6)'; CTX.lineWidth=2*DPR;
+    CTX.beginPath();
+    const cx = s/2, cy = s*0.82, d = 7*DPR;
+    if (dir.x===1){ CTX.moveTo(cx-d,cy); CTX.lineTo(cx+d,cy); CTX.lineTo(cx+d-6,cy-6); }
+    if (dir.x===-1){ CTX.moveTo(cx+d,cy); CTX.lineTo(cx-d,cy); CTX.lineTo(cx-d+6,cy-6); }
+    if (dir.y===1){ CTX.moveTo(cx,cy-10); CTX.lineTo(cx,cy+8); CTX.lineTo(cx-6,cy+2); }
+    if (dir.y===-1){ CTX.moveTo(cx,cy+8); CTX.lineTo(cx,cy-10); CTX.lineTo(cx-6,cy-4); }
+    CTX.stroke();
+    CTX.restore();
+  }
+  function drawCart(gx,gy,i){
+    const s=game.size, x=gx*s, y=gy*s;
+    CTX.save(); CTX.translate(x,y);
+    CTX.fillStyle = i%2? '#567' : '#495871';
+    roundedRect(4,4,s-8,s-8,6*DPR); CTX.fill();
+    // wheels
+    CTX.fillStyle = '#222'; CTX.beginPath(); CTX.arc(8, s-6, 3*DPR, 0, 2*Math.PI); CTX.fill();
+    CTX.beginPath(); CTX.arc(s-8, s-6, 3*DPR, 0, 2*Math.PI); CTX.fill();
+    CTX.restore();
+  }
+  function drawGrocery(gx,gy){
+    const s=game.size, x=gx*s, y=gy*s;
+    CTX.save(); CTX.translate(x,y);
+    // grocery bag
+    CTX.fillStyle = '#d7a96b';
+    roundedRect(4,6,s-8,s-10,6*DPR); CTX.fill();
+    CTX.strokeStyle = 'rgba(0,0,0,0.2)'; CTX.stroke();
+    // veggies
+    CTX.fillStyle = '#5fd16b'; CTX.beginPath(); CTX.arc(s*0.35,8, 4*DPR, 0, 2*Math.PI); CTX.fill();
+    CTX.fillStyle = '#ff6b6b'; CTX.beginPath(); CTX.arc(s*0.6,9, 4*DPR, 0, 2*Math.PI); CTX.fill();
+    CTX.restore();
+  }
+  function spawnGrocery(){
+    let x,y,ok=false;
+    while(!ok){
+      x = (Math.random()*game.cols)|0; y = (Math.random()*game.rows)|0;
+      ok = !game.snake.some(s=>s.x===x && s.y===y);
+    }
+    return {x,y};
+  }
+  function stepGame(now){
+    if (!game || !game.alive || game.paused) return;
+    const dt = now - game.lastTick;
+    if (dt < game.tickMs) return;
+    game.lastTick = now;
+    game.dir = game.nextDir;
+
+    const head = {...game.snake[0]};
+    head.x += game.dir.x; head.y += game.dir.y;
+    // wrap or collision? We'll consider walls as death (classic snake)
+    if (head.x<0||head.y<0||head.x>=game.cols||head.y>=game.rows){
+      return gameOver();
+    }
+    // self hit
+    if (game.snake.some(s=>s.x===head.x && s.y===head.y)){
+      return gameOver();
+    }
+    game.snake.unshift(head);
+    // check grocery
+    if (head.x===game.grocery.x && head.y===game.grocery.y){
+      game.score++;
+      profile.highScore = Math.max(profile.highScore||0, game.score);
+      incToday('games', game.score===1?1:0); // first pickup counts as "played"
+      grantXP(5);
+      const word = nextWord();
+      game.wordOnPickup = word;
+      if (!profile.learnedWords.includes(word.en)){
+        profile.learnedWords.push(word.en);
+        incToday('words',1);
+      }
+      saveProfile();
+      speakWord(word.en);
+      game.grocery = spawnGrocery();
+      // speed up slightly
+      game.tickMs = Math.max(70, game.tickMs-1.5);
+    } else {
+      game.snake.pop();
+    }
+  }
+  function gameOver(){
+    game.alive = false;
+    grantXP(3);
+    saveProfile();
+    // Show overlay
+    const w = CANVAS.width, h = CANVAS.height;
+    CTX.fillStyle = 'rgba(0,0,0,0.5)'; CTX.fillRect(0,0,w,h);
+    CTX.fillStyle = COL.white; CTX.textAlign='center';
+    CTX.font = `${28*DPR}px sans-serif`;
+    CTX.fillText('遊戲結束 · Game Over', w/2, h/2 - 30*DPR);
+    CTX.font = `${18*DPR}px sans-serif`;
+    CTX.fillText(`分數 Score: ${game.score}   最高 High: ${profile.highScore}`, w/2, h/2 + 6*DPR);
+    CTX.fillText('按 R 重新開始 · Press R to restart', w/2, h/2 + 36*DPR);
+  }
+
+  // ====== Progress helpers ====================================================
+  function incToday(key, by=1){
+    const t = TODAY();
+    if (!profile.daily[t]) profile.daily[t] = {xp:0, words:0, games:0};
+    profile.daily[t][key] = (profile.daily[t][key]||0) + by;
+    saveProfile();
+  }
+  function grantXP(v){
+    profile.xp += v;
+    incToday('xp', v);
+  }
+
+  // ====== Input handling ======================================================
+  CANVAS.addEventListener('mousemove', (e)=>{
+    const rect = CANVAS.getBoundingClientRect();
+    const x = (e.clientX - rect.left)*DPR;
+    const y = (e.clientY - rect.top)*DPR;
+    hoverId = null;
+    for (const [id,r] of Object.entries(buttons)){
+      if (x>=r.x && x<=r.x+r.w && y>=r.y && y<=r.y+r.h) { hoverId=id; break; }
+    }
+    draw();
+  });
+  CANVAS.addEventListener('click', ()=>{
+    if (!hoverId) return;
+    handleButton(hoverId);
+  });
+
+  CANVAS.addEventListener('keydown', (e)=>{
+    // prevent arrow scroll
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+    if (screen===SCREENS.SNAKE && game){
+      if (!game.started && ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) game.started=true;
+      if (e.key==='ArrowUp' && game.dir.y!==1) game.nextDir={x:0,y:-1};
+      if (e.key==='ArrowDown' && game.dir.y!==-1) game.nextDir={x:0,y:1};
+      if (e.key==='ArrowLeft' && game.dir.x!==1) game.nextDir={x:-1,y:0};
+      if (e.key==='ArrowRight' && game.dir.x!==-1) game.nextDir={x:1,y:0};
+      if (e.key==='p' || e.key==='P'){ if(game.started){ game.paused=!game.paused; } }
+      if (e.key==='r' || e.key==='R'){ startGame(); }
+      if (e.key==='m' || e.key==='M'){ screen=SCREENS.MENU; }
+    }
+    if (e.key==='Escape'){ screen=SCREENS.MENU; }
+    draw();
+  });
+
+  function handleButton(id){
+    switch(id){
+      case 'toDash': screen=SCREENS.DASH; break;
+      case 'toFlash': screen=SCREENS.FLASH; break;
+      case 'toQuiz': screen=SCREENS.QUIZ; break;
+      case 'toSnake': screen=SCREENS.SNAKE; startGame(); break;
+      case 'backMenu': screen=SCREENS.MENU; break;
+
+      case 'flashFlip': flashFlip(); break;
+      case 'flashKnow': flashAdvance(true); break;
+      case 'flashPractice': flashAdvance(false); break;
+
+      default:
+        if (id.startsWith('quizOpt')) {
+          const idx = +id.replace('quizOpt','');
+          quizChoose(idx);
+        }
+    }
+    draw();
+  }
+
+  // ====== Main draw loop ======================================================
+  function draw() {
+    hoverId = hoverId; // no-op to keep scope happy
+    buttonsClear();
+
+    switch(screen){
+      case SCREENS.MENU:  drawMenu(); break;
+      case SCREENS.DASH:  drawDash(); break;
+      case SCREENS.FLASH: drawFlash(); break;
+      case SCREENS.QUIZ:  drawQuiz(); break;
+      case SCREENS.SNAKE: drawSnake(); break;
+    }
+  }
+  function buttonsClear(){ for (const k of Object.keys(buttons)) delete buttons[k]; }
+
+  function tick(now){
+    if (screen===SCREENS.SNAKE && game && game.alive && game.started && !game.paused){
+      stepGame(now);
+      draw();
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // ====== Boot ================================================================
+  resize();
+  draw();
+  requestAnimationFrame(tick);
+  CANVAS.focus();
+
+})();
+</script>
+</body>
+</html>
