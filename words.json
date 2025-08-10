@@ -1,0 +1,15 @@
+{
+  "Groceries": [
+    { "en": "apple", "zh": "蘋果" },
+    { "en": "bread", "zh": "麵包" },
+    { "en": "milk", "zh": "牛奶" }
+  ],
+  "Travel": [
+    { "en": "airport", "zh": "機場" },
+    { "en": "ticket", "zh": "票" }
+  ],
+  "Verbs": [
+    { "en": "eat", "zh": "吃" },
+    { "en": "run", "zh": "跑" }
+  ]
+}
