@@ -1,6 +1,5 @@
 {
   "Daily Life": [
-    // ===== EASY =====
     {"en":"apple","zh":"蘋果","level":"easy"},
     {"en":"water","zh":"水","level":"easy"},
     {"en":"bread","zh":"麵包","level":"easy"},
@@ -41,7 +40,6 @@
     {"en":"food","zh":"食物","level":"easy"},
     {"en":"drink","zh":"飲料","level":"easy"},
 
-    // ===== NORMAL =====
     {"en":"blanket","zh":"毯子","level":"normal"},
     {"en":"laundry","zh":"洗衣","level":"normal"},
     {"en":"microwave","zh":"微波爐","level":"normal"},
@@ -80,7 +78,6 @@
     {"en":"stamp","zh":"郵票","level":"normal"},
     {"en":"envelope","zh":"信封","level":"normal"},
 
-    // ===== HARD =====
     {"en":"overtime","zh":"加班","level":"hard"},
     {"en":"procrastinate","zh":"拖延","level":"hard"},
     {"en":"multitask","zh":"同時處理多事","level":"hard"},
@@ -117,7 +114,6 @@
     {"en":"regulation","zh":"規定","level":"hard"}
 ],
   "Travel": [
-    // ===== EASY =====
     {"en":"bus","zh":"公車","level":"easy"},
     {"en":"ticket","zh":"票","level":"easy"},
     {"en":"map","zh":"地圖","level":"easy"},
@@ -154,7 +150,6 @@
     {"en":"tram","zh":"有軌電車","level":"easy"},
     {"en":"ferry","zh":"渡輪","level":"easy"},
 
-    // ===== NORMAL =====
     {"en":"airport","zh":"機場","level":"normal"},
     {"en":"subway","zh":"地鐵","level":"normal"},
     {"en":"reservation","zh":"預約","level":"normal"},
@@ -190,7 +185,6 @@
     {"en":"border","zh":"邊境","level":"normal"},
     {"en":"crossing","zh":"通關","level":"normal"},
 
-    // ===== HARD =====
     {"en":"immigration","zh":"入境審查","level":"hard"},
     {"en":"currency exchange","zh":"外幣兌換","level":"hard"},
     {"en":"turbulence","zh":"亂流","level":"hard"},
@@ -227,7 +221,6 @@
     {"en":"airport lounge","zh":"機場貴賓室","level":"hard"}
 ],
   "Food & Drinks": [
-    // ===== EASY =====
     {"en":"noodles","zh":"麵條","level":"easy"},
     {"en":"soup","zh":"湯","level":"easy"},
     {"en":"rice","zh":"米飯","level":"easy"},
@@ -268,7 +261,6 @@
     {"en":"sugar","zh":"糖","level":"easy"},
     {"en":"butter","zh":"奶油","level":"easy"},
 
-    // ===== NORMAL =====
     {"en":"soy sauce","zh":"醬油","level":"normal"},
     {"en":"dumplings","zh":"水餃","level":"normal"},
     {"en":"spicy","zh":"辣的","level":"normal"},
@@ -307,7 +299,6 @@
     {"en":"dumpling soup","zh":"餃子湯","level":"normal"},
     {"en":"noodle soup","zh":"湯麵","level":"normal"},
 
-    // ===== HARD =====
     {"en":"lactose intolerant","zh":"乳糖不耐","level":"hard"},
     {"en":"fermented tofu","zh":"腐乳","level":"hard"},
     {"en":"truffle","zh":"松露","level":"hard"},
@@ -342,7 +333,6 @@
     {"en":"anti-caking agent","zh":"防結塊劑","level":"hard"}
 ],
   "School": [
-    // ===== EASY =====
     {"en":"pencil","zh":"鉛筆","level":"easy"},
     {"en":"classroom","zh":"教室","level":"easy"},
     {"en":"homework","zh":"作業","level":"easy"},
@@ -378,7 +368,6 @@
     {"en":"whiteboard eraser","zh":"白板擦","level":"easy"},
     {"en":"pen case","zh":"筆袋","level":"easy"},
 
-    // ===== NORMAL =====
     {"en":"semester","zh":"學期","level":"normal"},
     {"en":"presentation","zh":"簡報","level":"normal"},
     {"en":"laboratory","zh":"實驗室","level":"normal"},
@@ -414,7 +403,6 @@
     {"en":"orchestra","zh":"管弦樂團","level":"normal"},
     {"en":"math competition","zh":"數學競賽","level":"normal"},
 
-    // ===== HARD =====
     {"en":"plagiarism","zh":"抄襲","level":"hard"},
     {"en":"curriculum","zh":"課程規劃","level":"hard"},
     {"en":"extracurricular","zh":"課外的","level":"hard"},
@@ -447,7 +435,6 @@
     {"en":"instructional design","zh":"教學設計","level":"hard"}
 ],
   "Work & Tech": [
-    // ===== EASY =====
     {"en":"job","zh":"工作","level":"easy"},
     {"en":"office","zh":"辦公室","level":"easy"},
     {"en":"boss","zh":"老闆","level":"easy"},
@@ -479,7 +466,6 @@
     {"en":"printer paper","zh":"列印紙","level":"easy"},
     {"en":"video call","zh":"視訊通話","level":"easy"},
 
-    // ===== NORMAL =====
     {"en":"conference","zh":"會議、大會","level":"normal"},
     {"en":"negotiation","zh":"談判","level":"normal"},
     {"en":"promotion","zh":"升遷","level":"normal"},
@@ -513,7 +499,6 @@
     {"en":"workflow","zh":"工作流程","level":"normal"},
     {"en":"version control","zh":"版本控制","level":"normal"},
 
-    // ===== HARD =====
     {"en":"blockchain","zh":"區塊鏈","level":"hard"},
     {"en":"cryptocurrency","zh":"加密貨幣","level":"hard"},
     {"en":"augmented reality","zh":"擴增實境","level":"hard"},
@@ -550,7 +535,6 @@
     {"en":"serverless computing","zh":"無伺服器運算","level":"hard"}
 ],
   "Health": [
-    // ===== EASY =====
     {"en":"doctor","zh":"醫生","level":"easy"},
     {"en":"nurse","zh":"護士","level":"easy"},
     {"en":"patient","zh":"病人","level":"easy"},
@@ -582,7 +566,6 @@
     {"en":"cast","zh":"石膏","level":"easy"},
     {"en":"ointment","zh":"藥膏","level":"easy"},
 
-    // ===== NORMAL =====
     {"en":"appointment","zh":"門診預約","level":"normal"},
     {"en":"symptom","zh":"症狀","level":"normal"},
     {"en":"diagnosis","zh":"診斷","level":"normal"},
@@ -615,7 +598,6 @@
     {"en":"health insurance","zh":"健康保險","level":"normal"},
     {"en":"cholesterol test","zh":"膽固醇檢測","level":"normal"},
 
-    // ===== HARD =====
     {"en":"cholesterol","zh":"膽固醇","level":"hard"},
     {"en":"inflammation","zh":"發炎","level":"hard"},
     {"en":"anesthesia","zh":"麻醉","level":"hard"},
@@ -650,7 +632,6 @@
     {"en":"epidemiological surveillance","zh":"流行病監測","level":"hard"}
 ],
   "Hobbies & Sports": [
-    // ===== EASY =====
     {"en":"music","zh":"音樂","level":"easy"},
     {"en":"movie","zh":"電影","level":"easy"},
     {"en":"basketball","zh":"籃球","level":"easy"},
@@ -680,7 +661,6 @@
     {"en":"board games","zh":"桌遊","level":"easy"},
     {"en":"puzzle","zh":"拼圖","level":"easy"},
 
-    // ===== NORMAL =====
     {"en":"hiking","zh":"健行","level":"normal"},
     {"en":"yoga","zh":"瑜伽","level":"normal"},
     {"en":"photography","zh":"攝影","level":"normal"},
@@ -715,7 +695,6 @@
     {"en":"drumming","zh":"打鼓","level":"normal"},
     {"en":"piano playing","zh":"彈鋼琴","level":"normal"},
 
-    // ===== HARD =====
     {"en":"triathlon","zh":"鐵人三項","level":"hard"},
     {"en":"calisthenics","zh":"徒手健身","level":"hard"},
     {"en":"improvisation","zh":"即興表演","level":"hard"},
@@ -750,7 +729,6 @@
     {"en":"circus acrobatics","zh":"馬戲特技","level":"hard"}
 ],
   "Nature & Weather": [
-    // ===== EASY =====
     {"en":"sunny","zh":"晴朗","level":"easy"},
     {"en":"rain","zh":"下雨","level":"easy"},
     {"en":"wind","zh":"風","level":"easy"},
@@ -780,8 +758,7 @@
     {"en":"shore","zh":"岸邊","level":"easy"},
     {"en":"valley","zh":"山谷","level":"easy"},
     {"en":"cliff","zh":"懸崖","level":"easy"},
-
-    // ===== NORMAL =====
+    
     {"en":"thunder","zh":"雷聲","level":"normal"},
     {"en":"typhoon","zh":"颱風","level":"normal"},
     {"en":"earthquake","zh":"地震","level":"normal"},
@@ -811,7 +788,6 @@
     {"en":"hot spring","zh":"溫泉","level":"normal"},
     {"en":"karst","zh":"喀斯特地形","level":"normal"},
 
-    // ===== HARD =====
     {"en":"ecosystem","zh":"生態系","level":"hard"},
     {"en":"photosynthesis","zh":"光合作用","level":"hard"},
     {"en":"biodiversity","zh":"生物多樣性","level":"hard"},
@@ -843,7 +819,6 @@
     {"en":"geomorphology","zh":"地貌學","level":"hard"}
 ],
   "Shopping & Money": [
-    // ===== EASY =====
     {"en":"price","zh":"價格","level":"easy"},
     {"en":"cash","zh":"現金","level":"easy"},
     {"en":"receipt","zh":"收據","level":"easy"},
@@ -874,7 +849,6 @@
     {"en":"checkout","zh":"結帳","level":"easy"},
     {"en":"catalog","zh":"商品目錄","level":"easy"},
 
-    // ===== NORMAL =====
     {"en":"refund","zh":"退款","level":"normal"},
     {"en":"warranty","zh":"保固","level":"normal"},
     {"en":"delivery","zh":"配送","level":"normal"},
@@ -903,7 +877,6 @@
     {"en":"auction","zh":"拍賣","level":"normal"},
     {"en":"cash on delivery","zh":"貨到付款","level":"normal"},
 
-    // ===== HARD =====
     {"en":"inflation","zh":"通貨膨脹","level":"hard"},
     {"en":"investment","zh":"投資","level":"hard"},
     {"en":"cryptocurrency","zh":"加密貨幣","level":"hard"},
@@ -936,7 +909,6 @@
     {"en":"trade deficit","zh":"貿易逆差","level":"hard"}
 ],
   "Useful Phrases": [
-    // ===== EASY =====
     {"en":"How much is this?","zh":"這個多少錢？","level":"easy"},
     {"en":"Where is the restroom?","zh":"洗手間在哪裡？","level":"easy"},
     {"en":"I’d like to order this.","zh":"我想點這個。","level":"easy"},
@@ -967,7 +939,6 @@
     {"en":"Nice to meet you.","zh":"很高興認識你。","level":"easy"},
     {"en":"Where are you from?","zh":"你來自哪裡？","level":"easy"},
 
-    // ===== NORMAL =====
     {"en":"I’m looking for a charger.","zh":"我在找充電器。","level":"normal"},
     {"en":"Do you have any recommendations?","zh":"你有什麼推薦嗎？","level":"normal"},
     {"en":"I’m allergic to peanuts.","zh":"我對花生過敏。","level":"normal"},
@@ -998,7 +969,6 @@
     {"en":"I’d like to cancel my order.","zh":"我想取消訂單。","level":"normal"},
     {"en":"What’s the password for the Wi-Fi?","zh":"Wi-Fi密碼是多少？","level":"normal"},
 
-    // ===== HARD =====
     {"en":"That doesn’t make sense to me.","zh":"我覺得這說不通。","level":"hard"},
     {"en":"Could you elaborate on that?","zh":"可以再詳細說明嗎？","level":"hard"},
     {"en":"Let’s negotiate the price.","zh":"我們來談談價格吧。","level":"hard"},
