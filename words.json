@@ -1,15 +1,126 @@
 {
   "Groceries": [
-    { "en": "apple", "zh": "蘋果" },
-    { "en": "bread", "zh": "麵包" },
-    { "en": "milk", "zh": "牛奶" }
+    {"en":"apple","zh":"蘋果"},{"en":"banana","zh":"香蕉"},{"en":"orange","zh":"橘子"},
+    {"en":"grape","zh":"葡萄"},{"en":"strawberry","zh":"草莓"},{"en":"watermelon","zh":"西瓜"},
+    {"en":"pineapple","zh":"鳳梨"},{"en":"mango","zh":"芒果"},{"en":"peach","zh":"桃子"},
+    {"en":"pear","zh":"梨子"},{"en":"tomato","zh":"番茄"},{"en":"potato","zh":"馬鈴薯"},
+    {"en":"carrot","zh":"紅蘿蔔"},{"en":"onion","zh":"洋蔥"},{"en":"garlic","zh":"大蒜"},
+    {"en":"cabbage","zh":"高麗菜"},{"en":"broccoli","zh":"花椰菜"},{"en":"spinach","zh":"菠菜"},
+    {"en":"eggplant","zh":"茄子"},{"en":"pepper","zh":"辣椒"},{"en":"rice","zh":"米"},
+    {"en":"noodles","zh":"麵條"},{"en":"bread","zh":"麵包"},{"en":"milk","zh":"牛奶"},
+    {"en":"egg","zh":"雞蛋"},{"en":"cheese","zh":"起司"},{"en":"yogurt","zh":"優格"},
+    {"en":"butter","zh":"奶油"},{"en":"chicken","zh":"雞肉"},{"en":"beef","zh":"牛肉"},
+    {"en":"pork","zh":"豬肉"},{"en":"fish","zh":"魚"},{"en":"shrimp","zh":"蝦"},
+    {"en":"tofu","zh":"豆腐"},{"en":"soy sauce","zh":"醬油"},{"en":"salt","zh":"鹽"},
+    {"en":"sugar","zh":"糖"},{"en":"oil","zh":"油"},{"en":"vinegar","zh":"醋"},
+    {"en":"tea","zh":"茶"},{"en":"coffee","zh":"咖啡"},{"en":"water","zh":"水"}
   ],
   "Travel": [
-    { "en": "airport", "zh": "機場" },
-    { "en": "ticket", "zh": "票" }
+    {"en":"airport","zh":"機場"},{"en":"ticket","zh":"票"},{"en":"hotel","zh":"飯店"},
+    {"en":"passport","zh":"護照"},{"en":"luggage","zh":"行李"},{"en":"train","zh":"火車"},
+    {"en":"bus","zh":"公車"},{"en":"subway","zh":"捷運"},{"en":"taxi","zh":"計程車"},
+    {"en":"reservation","zh":"預訂"},{"en":"check-in","zh":"辦理登機／入住"},
+    {"en":"boarding pass","zh":"登機證"},{"en":"gate","zh":"登機門"},
+    {"en":"arrival","zh":"到達"},{"en":"departure","zh":"出發"},{"en":"customs","zh":"海關"},
+    {"en":"map","zh":"地圖"},{"en":"tour","zh":"旅遊團"},{"en":"guide","zh":"導遊"}
   ],
   "Verbs": [
-    { "en": "eat", "zh": "吃" },
-    { "en": "run", "zh": "跑" }
+    {"en":"be","zh":"是"},{"en":"have","zh":"有"},{"en":"do","zh":"做"},{"en":"go","zh":"去"},
+    {"en":"come","zh":"來"},{"en":"see","zh":"看到"},{"en":"look","zh":"看"},
+    {"en":"watch","zh":"觀看"},{"en":"hear","zh":"聽到"},{"en":"listen","zh":"聽"},
+    {"en":"say","zh":"說"},{"en":"speak","zh":"說話"},{"en":"tell","zh":"告訴"},
+    {"en":"ask","zh":"詢問"},{"en":"answer","zh":"回答"},{"en":"think","zh":"想"},
+    {"en":"know","zh":"知道"},{"en":"learn","zh":"學習"},{"en":"study","zh":"讀書"},
+    {"en":"teach","zh":"教"},{"en":"read","zh":"閱讀"},{"en":"write","zh":"寫"},
+    {"en":"open","zh":"打開"},{"en":"close","zh":"關上"},{"en":"start","zh":"開始"},
+    {"en":"finish","zh":"完成"},{"en":"need","zh":"需要"},{"en":"want","zh":"想要"},
+    {"en":"like","zh":"喜歡"},{"en":"love","zh":"愛"},{"en":"eat","zh":"吃"},
+    {"en":"drink","zh":"喝"},{"en":"buy","zh":"買"},{"en":"sell","zh":"賣"},
+    {"en":"pay","zh":"付款"},{"en":"bring","zh":"帶來"},{"en":"take","zh":"拿走"},
+    {"en":"give","zh":"給"},{"en":"get","zh":"得到"},{"en":"use","zh":"使用"},
+    {"en":"make","zh":"製作"},{"en":"build","zh":"建造"},{"en":"fix","zh":"修理"},
+    {"en":"drive","zh":"開車"},{"en":"walk","zh":"走路"},{"en":"run","zh":"跑步"},
+    {"en":"sleep","zh":"睡覺"},{"en":"work","zh":"工作"},{"en":"rest","zh":"休息"},
+    {"en":"play","zh":"玩"},{"en":"help","zh":"幫忙"},{"en":"wait","zh":"等待"},
+    {"en":"choose","zh":"選擇"},{"en":"change","zh":"改變"},{"en":"move","zh":"移動"},
+    {"en":"live","zh":"居住"},{"en":"call","zh":"打電話"},{"en":"meet","zh":"見面"}
+  ],
+  "Animals": [
+    {"en":"dog","zh":"狗"},{"en":"cat","zh":"貓"},{"en":"bird","zh":"鳥"},{"en":"fish","zh":"魚"},
+    {"en":"cow","zh":"牛"},{"en":"pig","zh":"豬"},{"en":"sheep","zh":"羊"},{"en":"horse","zh":"馬"},
+    {"en":"chicken","zh":"雞"},{"en":"duck","zh":"鴨"},{"en":"goose","zh":"鵝"},
+    {"en":"monkey","zh":"猴子"},{"en":"tiger","zh":"老虎"},{"en":"lion","zh":"獅子"},
+    {"en":"elephant","zh":"大象"},{"en":"bear","zh":"熊"}
+  ],
+  "Clothing": [
+    {"en":"shirt","zh":"襯衫"},{"en":"T-shirt","zh":"T 恤"},{"en":"pants","zh":"長褲"},
+    {"en":"shorts","zh":"短褲"},{"en":"skirt","zh":"裙子"},{"en":"dress","zh":"洋裝"},
+    {"en":"coat","zh":"外套"},{"en":"jacket","zh":"夾克"},{"en":"shoes","zh":"鞋子"},
+    {"en":"socks","zh":"襪子"},{"en":"hat","zh":"帽子"},{"en":"scarf","zh":"圍巾"}
+  ],
+  "Body": [
+    {"en":"head","zh":"頭"},{"en":"hair","zh":"頭髮"},{"en":"face","zh":"臉"},{"en":"eye","zh":"眼睛"},
+    {"en":"ear","zh":"耳朵"},{"en":"nose","zh":"鼻子"},{"en":"mouth","zh":"嘴巴"},{"en":"tooth","zh":"牙齒"},
+    {"en":"neck","zh":"脖子"},{"en":"shoulder","zh":"肩膀"},{"en":"arm","zh":"手臂"},{"en":"hand","zh":"手"},
+    {"en":"finger","zh":"手指"},{"en":"leg","zh":"腿"},{"en":"knee","zh":"膝蓋"},{"en":"foot","zh":"腳"}
+  ],
+  "Technology": [
+    {"en":"phone","zh":"手機"},{"en":"tablet","zh":"平板"},{"en":"computer","zh":"電腦"},
+    {"en":"laptop","zh":"筆電"},{"en":"internet","zh":"網路"},{"en":"website","zh":"網站"},
+    {"en":"app","zh":"應用程式"},{"en":"password","zh":"密碼"},{"en":"account","zh":"帳號"},
+    {"en":"download","zh":"下載"},{"en":"upload","zh":"上傳"},{"en":"update","zh":"更新"}
+  ],
+  "School": [
+    {"en":"school","zh":"學校"},{"en":"teacher","zh":"老師"},{"en":"student","zh":"學生"},
+    {"en":"classroom","zh":"教室"},{"en":"homework","zh":"作業"},{"en":"exam","zh":"考試"},
+    {"en":"book","zh":"書"},{"en":"notebook","zh":"筆記本"},{"en":"pen","zh":"筆"},
+    {"en":"pencil","zh":"鉛筆"},{"en":"eraser","zh":"橡皮擦"},{"en":"ruler","zh":"尺"}
+  ],
+  "Work": [
+    {"en":"office","zh":"辦公室"},{"en":"meeting","zh":"會議"},{"en":"project","zh":"專案"},
+    {"en":"report","zh":"報告"},{"en":"deadline","zh":"截止日"},{"en":"salary","zh":"薪水"},
+    {"en":"manager","zh":"經理"},{"en":"colleague","zh":"同事"},{"en":"company","zh":"公司"}
+  ],
+  "Weather": [
+    {"en":"sunny","zh":"晴天"},{"en":"cloudy","zh":"多雲"},{"en":"rainy","zh":"下雨"},
+    {"en":"stormy","zh":"暴風雨"},{"en":"snowy","zh":"下雪"},{"en":"windy","zh":"有風"},
+    {"en":"hot","zh":"炎熱"},{"en":"cold","zh":"寒冷"},{"en":"warm","zh":"溫暖"},{"en":"cool","zh":"涼爽"}
+  ],
+  "Sports": [
+    {"en":"soccer","zh":"足球"},{"en":"basketball","zh":"籃球"},{"en":"baseball","zh":"棒球"},
+    {"en":"tennis","zh":"網球"},{"en":"table tennis","zh":"桌球"},{"en":"badminton","zh":"羽毛球"},
+    {"en":"swimming","zh":"游泳"},{"en":"running","zh":"跑步"},{"en":"cycling","zh":"騎腳踏車"}
+  ],
+  "Colors": [
+    {"en":"red","zh":"紅色"},{"en":"blue","zh":"藍色"},{"en":"yellow","zh":"黃色"},{"en":"green","zh":"綠色"},
+    {"en":"black","zh":"黑色"},{"en":"white","zh":"白色"},{"en":"purple","zh":"紫色"},{"en":"orange","zh":"橘色"},
+    {"en":"pink","zh":"粉紅色"},{"en":"brown","zh":"咖啡色"},{"en":"gray","zh":"灰色"}
+  ],
+  "Time & Dates": [
+    {"en":"morning","zh":"早上"},{"en":"afternoon","zh":"下午"},{"en":"evening","zh":"晚上"},{"en":"night","zh":"夜晚"},
+    {"en":"today","zh":"今天"},{"en":"yesterday","zh":"昨天"},{"en":"tomorrow","zh":"明天"},
+    {"en":"week","zh":"週"},{"en":"month","zh":"月"},{"en":"year","zh":"年"},{"en":"minute","zh":"分鐘"},
+    {"en":"hour","zh":"小時"},{"en":"second","zh":"秒鐘"}
+  ],
+  "Household": [
+    {"en":"house","zh":"房子"},{"en":"apartment","zh":"公寓"},{"en":"room","zh":"房間"},
+    {"en":"kitchen","zh":"廚房"},{"en":"bathroom","zh":"浴室"},{"en":"bedroom","zh":"臥室"},
+    {"en":"living room","zh":"客廳"},{"en":"table","zh":"桌子"},{"en":"chair","zh":"椅子"},
+    {"en":"sofa","zh":"沙發"},{"en":"bed","zh":"床"},{"en":"lamp","zh":"燈"}
+  ],
+  "Nature": [
+    {"en":"mountain","zh":"山"},{"en":"river","zh":"河"},{"en":"lake","zh":"湖"},
+    {"en":"sea","zh":"海"},{"en":"forest","zh":"森林"},{"en":"tree","zh":"樹"},
+    {"en":"flower","zh":"花"},{"en":"grass","zh":"草"},{"en":"stone","zh":"石頭"}
+  ],
+  "Transportation": [
+    {"en":"car","zh":"汽車"},{"en":"motorcycle","zh":"機車"},{"en":"bicycle","zh":"腳踏車"},
+    {"en":"truck","zh":"卡車"},{"en":"boat","zh":"船"},{"en":"ship","zh":"輪船"},
+    {"en":"airplane","zh":"飛機"},{"en":"helicopter","zh":"直升機"}
+  ],
+  "Emotions": [
+    {"en":"happy","zh":"開心的"},{"en":"sad","zh":"難過的"},{"en":"angry","zh":"生氣的"},
+    {"en":"tired","zh":"累的"},{"en":"excited","zh":"興奮的"},{"en":"worried","zh":"擔心的"},
+    {"en":"bored","zh":"無聊的"},{"en":"scared","zh":"害怕的"},{"en":"calm","zh":"冷靜的"}
   ]
 }
