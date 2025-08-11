@@ -16,7 +16,6 @@
   // ====== Config & Utilities ==================================================
   const CANVAS = document.getElementById('app');
   const CTX = CANVAS.getContext('2d');
-
   const DPR = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
   function resize() {
     CANVAS.width  = Math.floor(window.innerWidth * DPR);
@@ -28,31 +27,18 @@
 
   const TODAY = () => new Date().toISOString().slice(0,10); // YYYY-MM-DD
   const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
-  const rand = (a,b)=>Math.random()*(b-a)+a;
   const lerp = (a,b,t)=>a+(b-a)*t;
 
-  // Colors (Night Market vibe)
+  // Colors
   const COL = {
-    bgTop:    '#0b0f1a',
-    bgBot:    '#1a2236',
-    jade:     '#1cc2a0',
-    red:      '#ff3b30',
-    lantern:  '#ff934d',
-    gold:     '#ffcf59',
-    ink:      '#101422',
-    ink2:     '#172036',
-    card:     '#11203a',
-    line:     'rgba(255,255,255,0.15)',
-    white:    '#ffffff',
-    faint:    'rgba(255,255,255,0.6)',
-    dim:      'rgba(255,255,255,0.35)',
-    green:    '#23d18b',
-    blue:     '#38a1ff',
-    pink:     '#ff5fa2',
-    purple:   '#8a7dff',
+    bgTop:'#0b0f1a', bgBot:'#1a2236', jade:'#1cc2a0', red:'#ff3b30',
+    lantern:'#ff934d', gold:'#ffcf59', ink:'#101422', ink2:'#172036',
+    card:'#11203a', line:'rgba(255,255,255,0.15)', white:'#ffffff',
+    faint:'rgba(255,255,255,0.6)', dim:'rgba(255,255,255,0.35)',
+    green:'#23d18b', blue:'#38a1ff', pink:'#ff5fa2', purple:'#8a7dff',
   };
 
-  // Local storage profile
+  // ====== Local storage profile ==============================================
   const STORE_KEY = 'nightmarket_english_profile_v1';
   function loadProfile() {
     try {
@@ -66,7 +52,7 @@
       if (!d.highScore) d.highScore = 0;
       ensureStreak(d);
       return d;
-    } catch(e) {
+    } catch {
       return { createdAt:TODAY(), daily:{}, learnedWords:[], xp:0, streak:0, lastDate:'', highScore:0 };
     }
   }
@@ -83,12 +69,10 @@
     }
   }
   function saveProfile(){ localStorage.setItem(STORE_KEY, JSON.stringify(profile)); }
-
   let profile = loadProfile();
 
-  // ====== Word list ===========================================================
-  // ====== Vocabulary: load categories from words.json ==========================
-  let TOPICS = {};          // { "Groceries": [ {en, zh}, ... ], "Travel": [...] }
+  // ====== Vocabulary (from words.json) =======================================
+  let TOPICS = {};          // { "Groceries": [ {en, zh}, ... ], ... }
   let TOPIC_NAMES = [];
   let currentTopic = 'Groceries';
   let WORDS = [];
@@ -98,7 +82,6 @@
   function setTopic(name){
     currentTopic = name;
     WORDS = (TOPICS[name] || []).slice();
-    // refresh any decks that depend on WORDS
     wordIndex = 0;
     flash = { deck: shuffle([...WORDS]), showBack:false, current:null, lastFlip:0 };
     quiz  = { q:null, options:[], correct:0, total:0, feedback:'' };
@@ -107,11 +90,12 @@
   }
 
   function loadWords(){
-    fetch('./words.json?v=3', {cache:'no-store'}) // cache-bust + relative
+    fetch('./words.json?v=3', {cache:'no-store'})
       .then(res => res.json())
       .then(data => {
         TOPICS = data;
         TOPIC_NAMES = Object.keys(TOPICS);
+        if (!TOPIC_NAMES.length) throw new Error('No topics in words.json');
         if (!TOPIC_NAMES.includes(currentTopic)) currentTopic = TOPIC_NAMES[0];
         setTopic(currentTopic);
         wordsReady = true;
@@ -130,21 +114,22 @@
   function speakWord(enWord) {
     try {
       const u = new SpeechSynthesisUtterance(enWord);
-      u.lang = 'en-US';
-      u.rate = 0.95;
-      u.pitch = 1.0;
+      u.lang = 'en-US'; u.rate = 0.95; u.pitch = 1.0;
       const voices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
       const v = voices.find(v=>/en(-|_)?(US|GB)/i.test(v.lang)) || voices[0];
       if (v) u.voice = v;
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(u);
-    } catch(e) { /* fail silently */ }
+    } catch(e) {}
   }
 
   // ====== Scene management ====================================================
   const SCREENS = { MENU:'menu', DASH:'dash', FLASH:'flash', QUIZ:'quiz', SNAKE:'snake' };
   let screen = SCREENS.MENU;
   let hoverId = null;
+
+  // 🔧 GLOBAL buttons map (this was missing before and crashed the app)
+  const buttons = {};
 
   // ====== UI primitives on Canvas ============================================
   function drawBg() {
@@ -177,10 +162,7 @@
     CTX.fillStyle = 'rgba(0,0,0,0.2)';
     roundedRect(-16*DPR,-12*DPR,32*DPR,24*DPR,8*DPR);
     CTX.strokeStyle='rgba(255,255,255,0.15)'; CTX.stroke();
-
-    // knot
-    CTX.fillStyle = COL.red;
-    CTX.fillRect(-4*DPR,12*DPR,8*DPR,6*DPR);
+    CTX.fillStyle = COL.red; CTX.fillRect(-4*DPR,12*DPR,8*DPR,6*DPR);
     CTX.restore();
   }
   function roundedRect(x,y,w,h,r){
@@ -253,7 +235,7 @@
     CTX.restore();
   }
 
-  // ====== Dashboard ===========================================================
+  // ====== Dashboard top bar + Topic picker ===================================
   function drawTopBar(){
     const w = CANVAS.width, h = CANVAS.height;
     const day = profile.daily[TODAY()] || {xp:0,words:0,games:0};
@@ -261,12 +243,54 @@
     drawStatPill(w*0.25, h*0.08, 'XP 今日經驗', day.xp||0, COL.green);
     drawStatPill(w*0.41, h*0.08, 'Words 單字', day.words||0, COL.blue);
     drawStatPill(w*0.57, h*0.08, 'High Score 遊戲高分', profile.highScore||0, COL.pink);
+
+    // Topic picker (◀ topic ▶)
+    if (TOPIC_NAMES.length){
+      const y = h*0.08;
+      const label = `主題 Topic：${currentTopic}`;
+      CTX.font = `${12*DPR}px sans-serif`;
+      const m = CTX.measureText(label);
+      const pad = 12*DPR, pillW = m.width + pad*2, pillH = 24*DPR;
+      const xCenter = w*0.84;
+      const rx = xCenter - pillW/2, ry = y - pillH/2;
+      // pill background
+      CTX.fillStyle = 'rgba(0,0,0,0.35)';
+      roundedRect(rx, ry, pillW, pillH, 12*DPR); CTX.fill();
+      CTX.strokeStyle = COL.jade; CTX.lineWidth = 2*DPR; CTX.stroke();
+      // text
+      CTX.fillStyle = COL.white; CTX.textAlign='center';
+      CTX.fillText(label, xCenter, y + 4*DPR);
+
+      // left/right arrow hit targets
+      const aw = 22*DPR, ah = pillH;
+      const left = {x: rx - aw - 6*DPR, y: ry, w: aw, h: ah};
+      const right= {x: rx + pillW + 6*DPR, y: ry, w: aw, h: ah};
+      buttons['topicPrev'] = left;
+      buttons['topicNext'] = right;
+
+      // render arrows
+      drawMiniArrow(left,  'left');
+      drawMiniArrow(right, 'right');
+    }
+  }
+  function drawMiniArrow(rect, dir){
+    CTX.save();
+    CTX.translate(rect.x, rect.y);
+    CTX.fillStyle = 'rgba(0,0,0,0.35)';
+    roundedRect(0,0,rect.w,rect.h,8*DPR); CTX.fill();
+    CTX.strokeStyle = COL.line; CTX.lineWidth = 2*DPR; CTX.stroke();
+    CTX.fillStyle = COL.white;
+    CTX.beginPath();
+    const cx = rect.w/2, cy = rect.h/2, d = 6*DPR;
+    if (dir==='left'){ CTX.moveTo(cx+d,cy-d); CTX.lineTo(cx-d,cy); CTX.lineTo(cx+d,cy+d); }
+    else { CTX.moveTo(cx-d,cy-d); CTX.lineTo(cx+d,cy); CTX.lineTo(cx-d,cy+d); }
+    CTX.closePath(); CTX.fill();
+    CTX.restore();
   }
 
   // ====== MENU Screen ========================================================
-  const buttons = {};
   function drawMenu(){
-    drawBg(); drawTitle(); drawTopBar();
+    drawBg(); drawTitle(); buttonsClear(); drawTopBar();
     const w = CANVAS.width, h = CANVAS.height;
     const B = [
       {id:'toDash',   y: h*0.28, label:'📊 進度儀表板 Dashboard', sub:'每日目標 · 單字完成度'},
@@ -275,7 +299,7 @@
       {id:'toSnake',  y: h*0.64, label:'🛒 阿嬤買菜遊戲 (Snake)',     sub:'方向鍵操控 · 撿到就發音'},
     ];
     const rectW = Math.min(w*0.7, 740*DPR), rectH = 68*DPR;
-    B.forEach((b,i)=>{
+    B.forEach((b)=>{
       const rect = btnRect(w/2, b.y, rectW, rectH);
       buttons[b.id] = rect;
       drawButton(b.id, rect, b.label, b.sub);
@@ -287,7 +311,7 @@
 
   // ====== DASH Screen =========================================================
   function drawDash(){
-    drawBg(); drawTitle(); drawTopBar();
+    drawBg(); drawTitle(); buttonsClear(); drawTopBar();
     const w = CANVAS.width, h = CANVAS.height;
 
     function card(x,y,ww,hh, title, lines) {
@@ -336,17 +360,15 @@
   }
 
   // ====== FLASHCARDS ==========================================================
-  let flash = {
-    deck: shuffle([...WORDS]),
-    showBack:false,
-    current: null,
-    lastFlip: 0,
-  };
-  function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j= (Math.random()* (i+1))|0; [a[i],a[j]]=[a[j],a[i]]; } return a; }
+  let flash = { deck: [], showBack:false, current:null, lastFlip:0 };
+  function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [a[i],a[j]]=[a[j],a[i]]; } return a; }
   function drawFlash(){
-    drawBg(); drawTitle(); drawTopBar();
+    drawBg(); drawTitle(); buttonsClear(); drawTopBar();
     const w = CANVAS.width, h = CANVAS.height;
-    if (!flash.current) flash.current = flash.deck[0];
+    if (!flash.current) {
+      flash.deck = shuffle([...WORDS]);
+      flash.current = flash.deck[0] || null;
+    }
 
     const cw = Math.min(520*DPR, w*0.8), ch = Math.min(320*DPR, h*0.5);
     const cx = w/2 - cw/2, cy = h*0.3;
@@ -358,7 +380,7 @@
     CTX.textAlign='center';
     if (!flash.current){
       CTX.fillStyle = COL.faint; CTX.font = `${20*DPR}px sans-serif`;
-      CTX.fillText('載入單字中… Loading words…', cw/2, ch/2);
+      CTX.fillText(wordsReady?'沒有單字':'載入單字中… Loading words…', cw/2, ch/2);
     } else if (!flash.showBack){
       CTX.fillStyle = COL.white; CTX.font = `${32*DPR}px sans-serif`;
       CTX.fillText(flash.current.en, cw/2, ch/2);
@@ -385,12 +407,11 @@
   }
   function flashFlip(){ flash.showBack = !flash.showBack; }
   function flashAdvance(known){
-    if (!flash.deck.length) return; // guard if words not loaded
-    if (known) grantXP(5); else grantXP(3);
+    if (!flash.deck.length) return;
+    profile.xp += known ? 5 : 3; incToday('xp', known ? 5 : 3);
     const cur = flash.current;
     if (known && cur && !profile.learnedWords.includes(cur.en)){
-      profile.learnedWords.push(cur.en);
-      incToday('words',1);
+      profile.learnedWords.push(cur.en); incToday('words',1);
     }
     flash.deck.push(flash.deck.shift());
     flash.current = flash.deck[0] || null;
@@ -407,7 +428,7 @@
     quiz.q = base; quiz.options = options;
   }
   function drawQuiz(){
-    drawBg(); drawTitle(); drawTopBar();
+    drawBg(); drawTitle(); buttonsClear(); drawTopBar();
     const w = CANVAS.width, h = CANVAS.height;
     if (!quiz.q) genQuiz();
     CTX.textAlign='center';
@@ -445,14 +466,13 @@
     const pick = quiz.options[idx];
     if (pick.en === quiz.q.en){
       quiz.correct++; quiz.feedback = '✅ 正確！+10 XP';
-      grantXP(10);
+      profile.xp += 10; incToday('xp',10);
       if (!profile.learnedWords.includes(pick.en)){
-        profile.learnedWords.push(pick.en);
-        incToday('words',1);
+        profile.learnedWords.push(pick.en); incToday('words',1);
       }
     } else {
       quiz.feedback = `❌ 錯誤，正解是「${quiz.q.zh}」`;
-      grantXP(1);
+      profile.xp += 1; incToday('xp',1);
     }
     saveProfile();
     setTimeout(()=>{ quiz.feedback=''; genQuiz(); draw(); }, 700);
@@ -471,18 +491,10 @@
       size, cols, rows,
       ox: Math.floor((CANVAS.width - cols*size)/2),
       oy: Math.floor((CANVAS.height - rows*size)/2)+20*DPR,
-      dir: {x:1,y:0},
-      nextDir: {x:1,y:0},
-      snake: [],
-      grocery: null,
-      tickMs: 120,
-      elapsed: 0,
-      lastTick: performance.now(),
-      alive: true,
-      score: 0,
-      wordOnPickup: null,
-      started: false,
-      paused: false
+      dir: {x:1,y:0}, nextDir: {x:1,y:0},
+      snake: [], grocery: null, tickMs: 120, elapsed: 0,
+      lastTick: performance.now(), alive: true, score: 0,
+      wordOnPickup: null, started: false, paused: false
     };
     const x0 = Math.floor(cols/3), y0 = Math.floor(rows/2);
     game.snake = [{x:x0,y:y0},{x:x0-1,y:y0},{x:x0-2,y:y0}];
@@ -491,7 +503,7 @@
   }
 
   function drawSnake(){
-    drawBg(); drawTitle(); drawTopBar();
+    drawBg(); drawTitle(); buttonsClear(); drawTopBar();
     if (!game) startGame();
 
     CTX.save();
@@ -557,6 +569,7 @@
     CTX.beginPath(); CTX.arc( ex, ey, 2.5*DPR, 0, Math.PI*2); CTX.fill();
     CTX.strokeStyle = '#c05b6e'; CTX.lineWidth = 2.2*DPR;
     CTX.beginPath(); CTX.arc(0, s*0.06, s*0.10, 0, Math.PI); CTX.stroke();
+
     CTX.restore();
 
     CTX.strokeStyle = 'rgba(255,255,255,0.6)'; CTX.lineWidth=2*DPR;
@@ -605,23 +618,18 @@
 
     const head = {...game.snake[0]};
     head.x += game.dir.x; head.y += game.dir.y;
-    if (head.x<0||head.y<0||head.x>=game.cols||head.y>=game.rows){
-      return gameOver();
-    }
-    if (game.snake.some(s=>s.x===head.x && s.y===head.y)){
-      return gameOver();
-    }
+    if (head.x<0||head.y<0||head.x>=game.cols||head.y>=game.rows) return gameOver();
+    if (game.snake.some(s=>s.x===head.x && s.y===head.y)) return gameOver();
     game.snake.unshift(head);
     if (head.x===game.grocery.x && head.y===game.grocery.y){
       game.score++;
       profile.highScore = Math.max(profile.highScore||0, game.score);
-      incToday('games', game.score===1?1:0);
-      grantXP(5);
+      if (game.score===1) incToday('games',1);
+      profile.xp += 5; incToday('xp',5);
       const word = nextWord();
       game.wordOnPickup = word;
       if (!profile.learnedWords.includes(word.en)){
-        profile.learnedWords.push(word.en);
-        incToday('words',1);
+        profile.learnedWords.push(word.en); incToday('words',1);
       }
       saveProfile();
       speakWord(word.en);
@@ -633,7 +641,7 @@
   }
   function gameOver(){
     game.alive = false;
-    grantXP(3);
+    profile.xp += 3; incToday('xp',3);
     saveProfile();
     const w = CANVAS.width, h = CANVAS.height;
     CTX.fillStyle = 'rgba(0,0,0,0.5)'; CTX.fillRect(0,0,w,h);
@@ -651,10 +659,6 @@
     if (!profile.daily[t]) profile.daily[t] = {xp:0, words:0, games:0};
     profile.daily[t][key] = (profile.daily[t][key]||0) + by;
     saveProfile();
-  }
-  function grantXP(v){
-    profile.xp += v;
-    incToday('xp', v);
   }
 
   // ====== Input handling ======================================================
@@ -689,6 +693,14 @@
     draw();
   });
 
+  function cycleTopic(dir){
+    if (!TOPIC_NAMES.length) return;
+    const i = TOPIC_NAMES.indexOf(currentTopic);
+    const ni = (i + (dir==='next'?1:-1) + TOPIC_NAMES.length) % TOPIC_NAMES.length;
+    setTopic(TOPIC_NAMES[ni]);
+    draw();
+  }
+
   function handleButton(id){
     switch(id){
       case 'toDash': screen=SCREENS.DASH; break;
@@ -697,6 +709,11 @@
       case 'toSnake': screen=SCREENS.SNAKE; startGame(); break;
       case 'backMenu': screen=SCREENS.MENU; break;
 
+      // topic picker
+      case 'topicPrev': cycleTopic('prev'); return;
+      case 'topicNext': cycleTopic('next'); return;
+
+      // flash
       case 'flashFlip': flashFlip(); break;
       case 'flashKnow': flashAdvance(true); break;
       case 'flashPractice': flashAdvance(false); break;
@@ -712,9 +729,6 @@
 
   // ====== Main draw loop ======================================================
   function draw() {
-    // hoverId no-op intentional to preserve scope
-    buttonsClear();
-
     switch(screen){
       case SCREENS.MENU:  drawMenu(); break;
       case SCREENS.DASH:  drawDash(); break;
@@ -739,7 +753,6 @@
   draw();
   requestAnimationFrame(tick);
   CANVAS.focus();
-
 })();
 </script>
 </body>
