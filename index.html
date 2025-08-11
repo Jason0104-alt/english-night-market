@@ -48,7 +48,7 @@
   </div>
   <div class="pill">
     <label>Mode&nbsp;
-      <select id="modeSel">
+      <select id="modeSel" title="影響計時與遊戲速度，不影響抽字">
         <option value="easy">Easy</option>
         <option value="normal" selected>Normal</option>
         <option value="hard">Hard</option>
@@ -59,6 +59,16 @@
   <div class="pill">
     <label>Topic&nbsp;
       <select id="topicSel"><option value="">Loading…</option></select>
+    </label>
+  </div>
+  <div class="pill">
+    <label>Level&nbsp;
+      <select id="levelSel" title="依 words.json 的 level 欄位篩選">
+        <option value="all" selected>All</option>
+        <option value="easy">easy</option>
+        <option value="normal">normal</option>
+        <option value="hard">hard</option>
+      </select>
     </label>
   </div>
   <div class="pill">
@@ -139,7 +149,8 @@
     modeSel.value = currentMode;
     document.getElementById('timerHint').textContent = MODES[currentMode].label;
     if (game) game.tickMs = MODES[currentMode].snakeTick;
-    loadModeWords(currentMode);
+    // 注意：Mode 只控制時間/速度，不影響抽字；抽字由 Level 控制
+    draw();
   }
   modeSel.addEventListener('change', e=> setMode(e.target.value));
 
@@ -260,20 +271,17 @@
   let profile = ensureStreak(loadProfileLocal());
 
   // ====== Vocabulary & Topic ==================================================
-  // Built-in fallback words (used when JSON files missing)
-  const DEFAULT_WORDS = {
-    "Daily Life":[{"en":"apple","zh":"蘋果"},{"en":"water","zh":"水"},{"en":"bread","zh":"麵包"},{"en":"milk","zh":"牛奶"}],
-    "Travel":[{"en":"bus","zh":"公車"},{"en":"train","zh":"火車"},{"en":"ticket","zh":"票"},{"en":"hotel","zh":"飯店"}],
-    "Food & Drinks":[{"en":"noodles","zh":"麵條"},{"en":"soup","zh":"湯"},{"en":"chicken","zh":"雞肉"},{"en":"juice","zh":"果汁"}]
-  };
-
-  let TOPICS = {};      // { "Topic name": [ {en, zh}, ... ] }
+  // 只讀一個 words.json，Topic 與 Level 來自檔案
+  let TOPICS = {};         // { "Topic name": [ {en, zh, level}, ... ] }
   let TOPIC_NAMES = [];
   let currentTopic = localStorage.getItem('nm_topic') || '';
+  let currentLevel = localStorage.getItem('nm_level') || 'all';
   let WORDS = [];
   let wordsReady = false;
   let wordIndex = 0;
+
   const topicSel = document.getElementById('topicSel');
+  const levelSel = document.getElementById('levelSel');
 
   function refreshTopicSelect(){
     topicSel.innerHTML = '';
@@ -286,48 +294,68 @@
     topicSel.value = currentTopic || TOPIC_NAMES[0] || '';
   }
 
-  function setTopic(name){
-    if (!name) return;
-    currentTopic = name;
-    localStorage.setItem('nm_topic', name);
-    WORDS = (TOPICS[name] || []).slice();
+  function applyFilters(){
+    // 依 Topic + Level 取詞
+    const pool = (TOPICS[currentTopic] || []);
+    WORDS = (currentLevel==='all') ? pool.slice() : pool.filter(w => (w.level||'easy')===currentLevel);
     wordIndex = 0;
-    topicSel.value = name;
     flash = { deck: shuffle([...WORDS]), showBack:false, current:null, lastFlip:0 };
     quiz  = { q:null, options:[], correct:0, total:0, feedback:'', deadline:0, lastSecond:null };
     if (screen===SCREENS.SNAKE) startGame();
     saveProfile(); draw();
   }
+
+  function setTopic(name){
+    if (!name) return;
+    currentTopic = name;
+    localStorage.setItem('nm_topic', name);
+    applyFilters();
+  }
   topicSel.addEventListener('change', e=> setTopic(e.target.value));
 
-  async function loadModeWords(mode){
-    const map = { easy:'./words.json', normal:'./words_medium.json', hard:'./words_hard.json' };
-    const url = map[mode] || map.easy;
+  function setLevel(lv){
+    currentLevel = lv;
+    localStorage.setItem('nm_level', lv);
+    applyFilters();
+  }
+  levelSel.value = currentLevel;
+  levelSel.addEventListener('change', e=> setLevel(e.target.value));
 
+  async function loadWords(){
     async function fetchJson(u){
       const res = await fetch(u+'?v='+Date.now(), {cache:'no-store'});
       if(!res.ok) throw new Error('HTTP '+res.status);
       return res.json();
     }
-
     try{
-      let data = await fetchJson(url);
-      if (Array.isArray(data)) data = { "General": data }; // tolerate array root
+      let data = await fetchJson('./words.json'); // ← 只讀一個檔
       if (!data || typeof data!=='object' || !Object.keys(data).length) throw new Error('Invalid words structure');
+      // 容錯：如果根是陣列，包成 General
+      if (Array.isArray(data)) data = { "General": data };
+      // 確保每個詞都有 level 欄位（缺省給 easy）
+      for (const k of Object.keys(data)){
+        data[k] = (data[k]||[]).map(w => ({ en:String(w.en||'').trim(), zh:String(w.zh||'').trim(), level:(w.level||'easy').toLowerCase() }))
+                                .filter(w => w.en && w.zh);
+      }
       TOPICS = data;
     }catch(err){
-      console.warn('Load words failed; using DEFAULT_WORDS.', err);
-      toast('找不到 '+url+'，改用內建字彙（請確認檔名與路徑）', 4000);
-      TOPICS = DEFAULT_WORDS;
+      console.warn('Load words failed.', err);
+      toast('載入 words.json 失敗（請確認路徑與 JSON 格式）', 4000);
+      TOPICS = { "General":[ {en:"apple",zh:"蘋果",level:"easy"} ] }; // 最小保底
     }
     TOPIC_NAMES = Object.keys(TOPICS);
     if (!currentTopic || !TOPIC_NAMES.includes(currentTopic)) currentTopic = TOPIC_NAMES[0];
     refreshTopicSelect();
-    setTopic(currentTopic);
+    applyFilters();
     wordsReady = true;
   }
 
-  function nextWord(){ if (!WORDS.length) return {en:'loading…', zh:'載入中…'}; const w = WORDS[wordIndex % WORDS.length]; wordIndex++; return w; }
+  function nextWord(){
+    if (!WORDS.length) return {en:'loading…', zh:'載入中…'};
+    const w = WORDS[wordIndex % WORDS.length];
+    wordIndex++;
+    return w;
+  }
 
   // ====== Speech ==============================================================
   let preferredVoice = null;
@@ -358,7 +386,6 @@
     const {width:w,height:h} = CANVAS;
     const g = CTX.createLinearGradient(0,0,0,h); g.addColorStop(0,COL.bgTop); g.addColorStop(1,COL.bgBot);
     CTX.fillStyle=g; CTX.fillRect(0,0,w,h);
-    // fewer lanterns to reduce clutter
     const rows=3, cols=9;
     for (let r=0;r<rows;r++){
       const y=(h*0.14)+r*(h*0.14);
@@ -497,7 +524,7 @@
     }
     CTX.restore();
 
-    // Adaptive buttons so they never go off-screen
+    // 按鈕
     let bw=Math.min(660*DPR,w*0.9), bh=56*DPR, gap=14*DPR;
     const topY = cy+ch+34*DPR, bottomMargin=28*DPR;
     const avail=h - topY - bottomMargin, need=bh*3 + gap*2;
@@ -528,7 +555,9 @@
   // ====== QUIZ ================================================================
   let quiz = { q:null, options:[], correct:0, total:0, feedback:'', deadline:0, lastSecond:null };
   function genQuiz(){
-    const base=nextWord(); const wrongs=shuffle([...WORDS].filter(w=>w.en!==base.en)).slice(0,3);
+    if (!WORDS.length){ quiz.q=null; return; }
+    const base=nextWord();
+    const wrongs=shuffle([...WORDS].filter(w=>w.en!==base.en)).slice(0,3);
     quiz.q=base; quiz.options=shuffle([base, ...wrongs]);
     const secs=MODES[currentMode].quizTime; quiz.deadline=performance.now()+secs*1000; quiz.lastSecond=Math.ceil(secs);
   }
@@ -544,7 +573,9 @@
     CTX.fillStyle=COL.card; roundedRect(0,0,cw,ch,20*DPR); CTX.fill();
     CTX.strokeStyle=COL.line; CTX.lineWidth=2*DPR; CTX.stroke();
     CTX.fillStyle=COL.white; CTX.font=`${28*DPR}px sans-serif`; CTX.textAlign='center';
-    CTX.fillText(`請選出「${quiz.q.en}」的中文意思`, cw/2, ch/2 + 8*DPR);
+    const titleTxt = currentLevel==='all' ? `${currentTopic}（全部等級）`
+                    : `${currentTopic} · 等級：${currentLevel}`;
+    CTX.fillText(`請選出「${quiz.q ? quiz.q.en : '…'}」的中文意思`, cw/2, ch/2 + 8*DPR);
     CTX.restore();
 
     const seconds=Math.ceil(timeLeftMs()/1000);
@@ -715,8 +746,9 @@
 
   // ====== Boot ================================================================
   resize();
-  initFirebase();                 // optional; stays offline if config empty
-  setMode(currentMode);           // also loads words
+  initFirebase();                 // optional; stays offline if config空
+  loadWords();                    // ← 改成只讀 words.json（Topic+Level 全在檔案）
+  setMode(currentMode);           // 設定時間/速度
   draw();
   requestAnimationFrame(tick);
   CANVAS.focus();
