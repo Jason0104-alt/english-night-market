@@ -7,10 +7,64 @@
 <style>
   html,body { height:100%; margin:0; background:#0b0f1a; }
   canvas { display:block; width:100vw; height:100vh; outline:none; }
+
+  /* Top control bar */
+  #topControls {
+    position:fixed; left:12px; top:12px; z-index:10;
+    display:flex; gap:10px; font:14px/1.2 system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto;
+    color:#fff;
+  }
+  .pill {
+    background:#0e1626; border:1px solid rgba(255,255,255,.15); border-radius:12px;
+    padding:8px 10px; display:flex; gap:8px; align-items:center;
+  }
+  .pill button, .pill select {
+    background:#172034; color:#fff; border:1px solid rgba(255,255,255,.15);
+    border-radius:8px; padding:6px 10px; cursor:pointer;
+  }
+  .pill button:hover { filter:brightness(1.1); }
+  .pill select { outline:none; }
+  #authStatus { opacity:.8; }
 </style>
 </head>
 <body>
+
+<!-- === Music / SFX / Difficulty / Auth =================================== -->
+<div id="topControls">
+  <div class="pill">
+    <button id="musicBtn">🔈 Music</button>
+    <button id="sfxBtn">🔕 SFX</button>
+  </div>
+  <div class="pill">
+    <label>Mode&nbsp;
+      <select id="modeSel">
+        <option value="easy">Easy</option>
+        <option value="normal" selected>Normal</option>
+        <option value="hard">Hard</option>
+      </select>
+    </label>
+    <span id="timerHint" style="opacity:.8"></span>
+  </div>
+  <div class="pill">
+    <span id="authStatus">未登入</span>
+    <button id="loginBtn">登入</button>
+    <button id="logoutBtn" style="display:none">登出</button>
+  </div>
+</div>
+
+<!-- Audio (place mp3 files in /audio/) -->
+<audio id="bgm" src="./audio/bgm.mp3" loop preload="auto"></audio>
+<audio id="sfxCorrect" src="./audio/correct.mp3" preload="auto"></audio>
+<audio id="sfxWrong"   src="./audio/wrong.mp3"   preload="auto"></audio>
+<audio id="sfxTick"    src="./audio/tick.mp3"    preload="auto"></audio>
+
 <canvas id="app" tabindex="0"></canvas>
+
+<!-- (Optional) Firebase for login/cloud save. Leave as-is to stay offline. -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
 <script>
 (() => {
   // ====== Config & Utilities ==================================================
@@ -38,23 +92,133 @@
     green:'#23d18b', blue:'#38a1ff', pink:'#ff5fa2', purple:'#8a7dff',
   };
 
-  // ====== Local storage profile ==============================================
-  const STORE_KEY = 'nightmarket_english_profile_v1';
-  function loadProfile() {
-    try {
-      const d = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
-      if (!d.createdAt) d.createdAt = TODAY();
-      if (!d.daily) d.daily = {};
-      if (!d.learnedWords) d.learnedWords = [];
-      if (!d.xp) d.xp = 0;
-      if (!d.streak) d.streak = 0;
-      if (!d.lastDate) d.lastDate = '';
-      if (!d.highScore) d.highScore = 0;
-      ensureStreak(d);
-      return d;
-    } catch {
-      return { createdAt:TODAY(), daily:{}, learnedWords:[], xp:0, streak:0, lastDate:'', highScore:0 };
+  // ====== Modes & Timers ======================================================
+  const MODES = {
+    easy:   { quizTime: 25, snakeTick: 140, label:'⏱25s / 🐍慢' },
+    normal: { quizTime: 15, snakeTick: 120, label:'⏱15s / 🐍中' },
+    hard:   { quizTime: 7,  snakeTick: 95,  label:'⏱7s / 🐍快' }
+  };
+  let currentMode = localStorage.getItem('nm_mode') || 'normal';
+  document.getElementById('modeSel').value = currentMode;
+  document.getElementById('timerHint').textContent = MODES[currentMode].label;
+
+  function setMode(m){
+    currentMode = (m in MODES) ? m : 'normal';
+    localStorage.setItem('nm_mode', currentMode);
+    document.getElementById('modeSel').value = currentMode;
+    document.getElementById('timerHint').textContent = MODES[currentMode].label;
+    if (game) game.tickMs = MODES[currentMode].snakeTick;
+    // switch vocab by mode (fallback to easy)
+    loadModeWords(currentMode);
+  }
+  document.getElementById('modeSel').addEventListener('change', e=> setMode(e.target.value));
+
+  // ====== Audio ===============================================================
+  const A = {
+    bgm: document.getElementById('bgm'),
+    ok:  document.getElementById('sfxCorrect'),
+    bad: document.getElementById('sfxWrong'),
+    tick:document.getElementById('sfxTick')
+  };
+  let musicOn = localStorage.getItem('nm_music')==='1';
+  let sfxOn    = localStorage.getItem('nm_sfx')==='1';
+  function updateMusicUI(){
+    const b = document.getElementById('musicBtn');
+    b.textContent = musicOn ? '🔊 Music' : '🔈 Music';
+  }
+  function updateSfxUI(){
+    const b = document.getElementById('sfxBtn');
+    b.textContent = sfxOn ? '🔔 SFX' : '🔕 SFX';
+  }
+  function playSfx(which){
+    if (!sfxOn) return;
+    const el = which==='ok'?A.ok:which==='bad'?A.bad:which==='tick'?A.tick:null;
+    if (el){ try{ el.currentTime = 0; el.play(); }catch{} }
+  }
+  document.getElementById('musicBtn').onclick = async ()=>{
+    musicOn = !musicOn; localStorage.setItem('nm_music', musicOn?'1':'0');
+    updateMusicUI();
+    if (musicOn) { try{ await A.bgm.play(); }catch{} } else { A.bgm.pause(); }
+  };
+  document.getElementById('sfxBtn').onclick = ()=>{
+    sfxOn = !sfxOn; localStorage.setItem('nm_sfx', sfxOn?'1':'0'); updateSfxUI();
+  };
+  updateMusicUI(); updateSfxUI();
+
+  // ====== (Optional) Firebase Auth + Cloud Save ==============================
+  const FIREBASE_CONFIG = {
+    // 🔧 FILL THESE OR LEAVE EMPTY TO STAY OFFLINE:
+    // apiKey: "YOUR_API_KEY",
+    // authDomain: "YOUR_PROJECT.firebaseapp.com",
+    // projectId: "YOUR_PROJECT_ID",
+    // appId: "YOUR_APP_ID"
+  };
+  let fb = { app:null, auth:null, db:null, user:null, enabled:false };
+
+  function initFirebase(){
+    try{
+      if (!FIREBASE_CONFIG || !FIREBASE_CONFIG.apiKey) return; // offline
+      fb.app  = firebase.initializeApp(FIREBASE_CONFIG);
+      fb.auth = firebase.auth();
+      fb.db   = firebase.firestore();
+      fb.enabled = true;
+      fb.auth.onAuthStateChanged(async(u)=>{
+        fb.user = u || null;
+        updateAuthUI();
+        if (fb.user){ await loadProfileFromCloudMerge(); }
+      });
+    }catch(e){ fb.enabled=false; }
+  }
+  async function signIn(){
+    if (!fb.enabled){ alert('此站目前以本機模式運作（未設定 Firebase）'); return; }
+    try{
+      const provider = new firebase.auth.GoogleAuthProvider();
+      await fb.auth.signInWithPopup(provider);
+    }catch(e){ console.warn(e); }
+  }
+  async function signOut(){
+    if (!fb.enabled) return;
+    try{ await fb.auth.signOut(); }catch(e){}
+  }
+  function updateAuthUI(){
+    const s = document.getElementById('authStatus');
+    const inBtn = document.getElementById('loginBtn');
+    const outBtn= document.getElementById('logoutBtn');
+    if (fb.user){
+      s.textContent = `已登入：${fb.user.displayName || fb.user.email}`;
+      inBtn.style.display='none'; outBtn.style.display='';
+      if (musicOn) A.bgm.play().catch(()=>{});
+    }else{
+      s.textContent = '未登入';
+      inBtn.style.display=''; outBtn.style.display='none';
     }
+  }
+  document.getElementById('loginBtn').onclick = signIn;
+  document.getElementById('logoutBtn').onclick = signOut;
+
+  // ====== Local/Cloud profile ================================================
+  const STORE_KEY = 'nightmarket_english_profile_v1';
+  function newProfile(){
+    return { createdAt:TODAY(), updatedAt:Date.now(), daily:{}, learnedWords:[], xp:0, streak:0, lastDate:'', highScore:0 };
+  }
+  function loadProfileLocal(){
+    try { return JSON.parse(localStorage.getItem(STORE_KEY) || 'null') || newProfile(); }
+    catch { return newProfile(); }
+  }
+  async function loadProfileFromCloudMerge(){
+    // Merge cloud & local; prefer the most recently updated
+    const local = loadProfileLocal();
+    try{
+      const ref = fb.db.collection('nightmarket_profiles').doc(fb.user.uid);
+      const snap = await ref.get();
+      let cloud = snap.exists ? snap.data() : null;
+      let chosen = local;
+      if (cloud){
+        chosen = (cloud.updatedAt||0) > (local.updatedAt||0) ? cloud : local;
+      }
+      profile = ensureStreak(chosen); saveProfile(); // save back to both
+    }catch(e){ /* stay local */ }
+    draw();
   }
   function ensureStreak(p){
     const today = TODAY();
@@ -65,13 +229,21 @@
       p.streak = (prev === ystr) ? (p.streak||0)+1 : 1;
       p.lastDate = today;
       if (!p.daily[today]) p.daily[today] = { xp:0, words:0, games:0 };
-      saveProfile();
+    }
+    return p;
+  }
+  async function saveProfile(){
+    profile.updatedAt = Date.now();
+    localStorage.setItem(STORE_KEY, JSON.stringify(profile));
+    if (fb.enabled && fb.user){
+      try{
+        await fb.db.collection('nightmarket_profiles').doc(fb.user.uid).set(profile, { merge:true });
+      }catch(e){ /* ignore */ }
     }
   }
-  function saveProfile(){ localStorage.setItem(STORE_KEY, JSON.stringify(profile)); }
-  let profile = loadProfile();
+  let profile = ensureStreak(loadProfileLocal());
 
-  // ====== Vocabulary (from words.json) =======================================
+  // ====== Vocabulary (by mode) ===============================================
   let TOPICS = {};          // { "Groceries": [ {en, zh}, ... ], ... }
   let TOPIC_NAMES = [];
   let currentTopic = 'Groceries';
@@ -84,24 +256,36 @@
     WORDS = (TOPICS[name] || []).slice();
     wordIndex = 0;
     flash = { deck: shuffle([...WORDS]), showBack:false, current:null, lastFlip:0 };
-    quiz  = { q:null, options:[], correct:0, total:0, feedback:'' };
+    quiz  = { q:null, options:[], correct:0, total:0, feedback:'', deadline:0, lastSecond:null };
     if (screen===SCREENS.SNAKE) startGame();
     saveProfile();
   }
 
-  function loadWords(){
-    fetch('./words.json?v=3', {cache:'no-store'})
-      .then(res => res.json())
-      .then(data => {
-        TOPICS = data;
-        TOPIC_NAMES = Object.keys(TOPICS);
-        if (!TOPIC_NAMES.length) throw new Error('No topics in words.json');
-        if (!TOPIC_NAMES.includes(currentTopic)) currentTopic = TOPIC_NAMES[0];
-        setTopic(currentTopic);
-        wordsReady = true;
-        draw();
-      })
-      .catch(err => console.error('Error loading words:', err));
+  async function loadModeWords(mode){
+    const map = {
+      easy:   './words.json',
+      normal: './words_medium.json',
+      hard:   './words_hard.json'
+    };
+    const url = map[mode] || map.easy;
+    try{
+      const res = await fetch(url+'?v='+Date.now(), {cache:'no-store'});
+      if (!res.ok) throw 0;
+      const data = await res.json();
+      TOPICS = data;
+      TOPIC_NAMES = Object.keys(TOPICS);
+      if (!TOPIC_NAMES.length) throw 1;
+      if (!TOPIC_NAMES.includes(currentTopic)) currentTopic = TOPIC_NAMES[0];
+      setTopic(currentTopic);
+      wordsReady = true;
+      draw();
+    }catch{
+      if (url.endsWith('words.json')) { return; }
+      // fallback to easy
+      currentMode = 'easy'; document.getElementById('modeSel').value = 'easy';
+      document.getElementById('timerHint').textContent = MODES.easy.label;
+      await loadModeWords('easy');
+    }
   }
 
   function nextWord() {
@@ -111,13 +295,33 @@
   }
 
   // ====== Speech (voice-over) ================================================
+  let preferredVoice = null;
+  function pickVoice(){
+    try{
+      const voices = speechSynthesis.getVoices() || [];
+      // some nicer voices on Chrome/Android/iOS
+      const prefer = [
+        /Google US English/i, /Samantha/i, /Victoria/i, /Daniel/i, /Karen/i, /Serena/i, /English \(US\)/i
+      ];
+      for (const rx of prefer){
+        const v = voices.find(v=>rx.test(v.name)||rx.test(v.lang));
+        if (v){ preferredVoice = v; return; }
+      }
+      preferredVoice = voices[0] || null;
+    }catch{}
+  }
+  if ('speechSynthesis' in window){
+    window.speechSynthesis.onvoiceschanged = pickVoice;
+    pickVoice();
+  }
   function speakWord(enWord) {
     try {
       const u = new SpeechSynthesisUtterance(enWord);
-      u.lang = 'en-US'; u.rate = 0.95; u.pitch = 1.0;
-      const voices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
-      const v = voices.find(v=>/en(-|_)?(US|GB)/i.test(v.lang)) || voices[0];
-      if (v) u.voice = v;
+      u.lang = 'en-US';
+      // slightly vary to feel less robotic
+      u.rate = 0.92 + Math.random()*0.12; // 0.92–1.04
+      u.pitch = 0.95 + Math.random()*0.13; // 0.95–1.08
+      if (preferredVoice) u.voice = preferredVoice;
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(u);
     } catch(e) {}
@@ -128,7 +332,7 @@
   let screen = SCREENS.MENU;
   let hoverId = null;
 
-  // 🔧 GLOBAL buttons map (this was missing before and crashed the app)
+  // GLOBAL buttons map
   const buttons = {};
 
   // ====== UI primitives on Canvas ============================================
@@ -244,7 +448,6 @@
     drawStatPill(w*0.41, h*0.08, 'Words 單字', day.words||0, COL.blue);
     drawStatPill(w*0.57, h*0.08, 'High Score 遊戲高分', profile.highScore||0, COL.pink);
 
-    // Topic picker (◀ topic ▶)
     if (TOPIC_NAMES.length){
       const y = h*0.08;
       const label = `主題 Topic：${currentTopic}`;
@@ -253,24 +456,17 @@
       const pad = 12*DPR, pillW = m.width + pad*2, pillH = 24*DPR;
       const xCenter = w*0.84;
       const rx = xCenter - pillW/2, ry = y - pillH/2;
-      // pill background
       CTX.fillStyle = 'rgba(0,0,0,0.35)';
       roundedRect(rx, ry, pillW, pillH, 12*DPR); CTX.fill();
       CTX.strokeStyle = COL.jade; CTX.lineWidth = 2*DPR; CTX.stroke();
-      // text
       CTX.fillStyle = COL.white; CTX.textAlign='center';
       CTX.fillText(label, xCenter, y + 4*DPR);
 
-      // left/right arrow hit targets
       const aw = 22*DPR, ah = pillH;
-      const left = {x: rx - aw - 6*DPR, y: ry, w: aw, h: ah};
-      const right= {x: rx + pillW + 6*DPR, y: ry, w: aw, h: ah};
-      buttons['topicPrev'] = left;
-      buttons['topicNext'] = right;
-
-      // render arrows
-      drawMiniArrow(left,  'left');
-      drawMiniArrow(right, 'right');
+      const left  = {x: rx - aw - 6*DPR, y: ry, w: aw, h: ah};
+      const right = {x: rx + pillW + 6*DPR, y: ry, w: aw, h: ah};
+      buttons['topicPrev'] = left; buttons['topicNext'] = right;
+      drawMiniArrow(left,'left'); drawMiniArrow(right,'right');
     }
   }
   function drawMiniArrow(rect, dir){
@@ -408,7 +604,7 @@
   function flashFlip(){ flash.showBack = !flash.showBack; }
   function flashAdvance(known){
     if (!flash.deck.length) return;
-    profile.xp += known ? 5 : 3; incToday('xp', known ? 5 : 3);
+    grantXP(known ? 5 : 3);
     const cur = flash.current;
     if (known && cur && !profile.learnedWords.includes(cur.en)){
       profile.learnedWords.push(cur.en); incToday('words',1);
@@ -419,14 +615,19 @@
     saveProfile();
   }
 
-  // ====== QUIZ ================================================================
-  let quiz = { q:null, options:[], correct:0, total:0, feedback:'' };
+  // ====== QUIZ (with timer) ===================================================
+  let quiz = { q:null, options:[], correct:0, total:0, feedback:'', deadline:0, lastSecond:null };
   function genQuiz(){
     const base = nextWord();
     const wrongs = shuffle([...WORDS].filter(w=>w.en!==base.en)).slice(0,3);
     const options = shuffle([base, ...wrongs]);
     quiz.q = base; quiz.options = options;
+    const secs = MODES[currentMode].quizTime;
+    quiz.deadline = performance.now() + secs*1000;
+    quiz.lastSecond = Math.ceil(secs);
   }
+  function timeLeftMs(){ return Math.max(0, quiz.deadline - performance.now()); }
+
   function drawQuiz(){
     drawBg(); drawTitle(); buttonsClear(); drawTopBar();
     const w = CANVAS.width, h = CANVAS.height;
@@ -441,6 +642,12 @@
     CTX.fillStyle = COL.white; CTX.font = `${28*DPR}px sans-serif`;
     CTX.fillText(`請選出「${quiz.q.en}」的中文意思`, cw/2, ch/2 + 8*DPR);
     CTX.restore();
+
+    // countdown
+    const seconds = Math.ceil(timeLeftMs()/1000);
+    CTX.fillStyle = seconds<=3 ? COL.red : COL.white;
+    CTX.font = `${24*DPR}px sans-serif`;
+    CTX.fillText(`⏱ ${seconds}s`, w/2, cy - 24*DPR);
 
     const bw = Math.min(660*DPR, w*0.9), bh = 56*DPR, y0 = cy+ch+60*DPR;
     quiz.options.forEach((opt,i)=>{
@@ -466,13 +673,13 @@
     const pick = quiz.options[idx];
     if (pick.en === quiz.q.en){
       quiz.correct++; quiz.feedback = '✅ 正確！+10 XP';
-      profile.xp += 10; incToday('xp',10);
+      grantXP(10); playSfx('ok');
       if (!profile.learnedWords.includes(pick.en)){
         profile.learnedWords.push(pick.en); incToday('words',1);
       }
     } else {
       quiz.feedback = `❌ 錯誤，正解是「${quiz.q.zh}」`;
-      profile.xp += 1; incToday('xp',1);
+      grantXP(1); playSfx('bad');
     }
     saveProfile();
     setTimeout(()=>{ quiz.feedback=''; genQuiz(); draw(); }, 700);
@@ -492,7 +699,7 @@
       ox: Math.floor((CANVAS.width - cols*size)/2),
       oy: Math.floor((CANVAS.height - rows*size)/2)+20*DPR,
       dir: {x:1,y:0}, nextDir: {x:1,y:0},
-      snake: [], grocery: null, tickMs: 120, elapsed: 0,
+      snake: [], grocery: null, tickMs: MODES[currentMode].snakeTick, elapsed: 0,
       lastTick: performance.now(), alive: true, score: 0,
       wordOnPickup: null, started: false, paused: false
     };
@@ -625,7 +832,7 @@
       game.score++;
       profile.highScore = Math.max(profile.highScore||0, game.score);
       if (game.score===1) incToday('games',1);
-      profile.xp += 5; incToday('xp',5);
+      grantXP(5);
       const word = nextWord();
       game.wordOnPickup = word;
       if (!profile.learnedWords.includes(word.en)){
@@ -641,7 +848,7 @@
   }
   function gameOver(){
     game.alive = false;
-    profile.xp += 3; incToday('xp',3);
+    grantXP(3);
     saveProfile();
     const w = CANVAS.width, h = CANVAS.height;
     CTX.fillStyle = 'rgba(0,0,0,0.5)'; CTX.fillRect(0,0,w,h);
@@ -658,8 +865,8 @@
     const t = TODAY();
     if (!profile.daily[t]) profile.daily[t] = {xp:0, words:0, games:0};
     profile.daily[t][key] = (profile.daily[t][key]||0) + by;
-    saveProfile();
   }
+  function grantXP(v){ profile.xp += v; incToday('xp', v); }
 
   // ====== Input handling ======================================================
   CANVAS.addEventListener('mousemove', (e)=>{
@@ -708,16 +915,11 @@
       case 'toQuiz': screen=SCREENS.QUIZ; break;
       case 'toSnake': screen=SCREENS.SNAKE; startGame(); break;
       case 'backMenu': screen=SCREENS.MENU; break;
-
-      // topic picker
       case 'topicPrev': cycleTopic('prev'); return;
       case 'topicNext': cycleTopic('next'); return;
-
-      // flash
       case 'flashFlip': flashFlip(); break;
       case 'flashKnow': flashAdvance(true); break;
       case 'flashPractice': flashAdvance(false); break;
-
       default:
         if (id.startsWith('quizOpt')) {
           const idx = +id.replace('quizOpt','');
@@ -744,12 +946,28 @@
       stepGame(now);
       draw();
     }
+    // quiz timer tick
+    if (screen===SCREENS.QUIZ && quiz.q){
+      const secs = Math.ceil(timeLeftMs()/1000);
+      if (quiz.lastSecond !== secs){
+        quiz.lastSecond = secs;
+        if (secs<=3 && secs>0) playSfx('tick');
+        draw();
+      }
+      if (timeLeftMs()<=0){
+        quiz.total++;
+        quiz.feedback = `⌛ 時間到！正解是「${quiz.q.zh}」`;
+        playSfx('bad');
+        setTimeout(()=>{ quiz.feedback=''; genQuiz(); draw(); }, 700);
+      }
+    }
     requestAnimationFrame(tick);
   }
 
   // ====== Boot ================================================================
   resize();
-  loadWords();
+  initFirebase();                    // optional; harmless if not configured
+  setMode(currentMode);              // loads words for mode + sets speeds
   draw();
   requestAnimationFrame(tick);
   CANVAS.focus();
