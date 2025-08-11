@@ -89,22 +89,38 @@
 
   // ====== Word list ===========================================================
   // Simple curated starter deck (en → zh). You can expand freely.
-  const WORDS = [
-    {en:'apple', zh:'蘋果'}, {en:'bread', zh:'麵包'}, {en:'milk', zh:'牛奶'}, {en:'rice', zh:'米飯'},
-    {en:'vegetable', zh:'蔬菜'}, {en:'fruit', zh:'水果'}, {en:'egg', zh:'雞蛋'},{en:'chicken', zh:'雞肉'},
-    {en:'beef', zh:'牛肉'},{en:'fish', zh:'魚'},{en:'noodle', zh:'麵'},{en:'water', zh:'水'},
-    {en:'tea', zh:'茶'},{en:'coffee', zh:'咖啡'},{en:'salt', zh:'鹽'},{en:'sugar', zh:'糖'},
-    {en:'spoon', zh:'湯匙'},{en:'chopsticks', zh:'筷子'},{en:'bowl', zh:'碗'},{en:'plate', zh:'盤子'},
-    {en:'market', zh:'市場'},{en:'grandma', zh:'阿嬤'},{en:'bag', zh:'袋子'},{en:'carrot', zh:'紅蘿蔔'},
-    {en:'tomato', zh:'番茄'},{en:'banana', zh:'香蕉'},{en:'grape', zh:'葡萄'},{en:'eggplant', zh:'茄子'},
-    {en:'onion', zh:'洋蔥'},{en:'garlic', zh:'大蒜'},{en:'pepper', zh:'胡椒'},{en:'ginger', zh:'薑'},
-    {en:'shop', zh:'商店'},{en:'cashier', zh:'收銀員'},{en:'discount', zh:'折扣'},{en:'fresh', zh:'新鮮的'},
-    {en:'delicious', zh:'美味的'},{en:'healthy', zh:'健康的'},{en:'hungry', zh:'餓的'},{en:'thirsty', zh:'渴的'},
-    {en:'morning', zh:'早上'},{en:'evening', zh:'晚上'},{en:'today', zh:'今天'},{en:'tomorrow', zh:'明天'},
-    {en:'practice', zh:'練習'},{en:'listen', zh:'聽'},{en:'speak', zh:'說'},{en:'repeat', zh:'重複'},
-    {en:'left', zh:'左邊'},{en:'right', zh:'右邊'},{en:'up', zh:'上'},{en:'down', zh:'下'}
-  ];
-  let wordIndex = 0;
+  // ====== Vocabulary: load categories from words.json ==========================
+let TOPICS = {};          // { "Groceries": [ {en, zh}, ... ], "Travel": [...] }
+let TOPIC_NAMES = [];
+let currentTopic = 'Groceries';
+let WORDS = [];
+let wordsReady = false;
+
+function setTopic(name){
+  currentTopic = name;
+  WORDS = (TOPICS[name] || []).slice();
+  // refresh any decks that depend on WORDS
+  wordIndex = 0;
+  flash = { deck: shuffle([...WORDS]), showBack:false, current:null, lastFlip:0 };
+  quiz  = { q:null, options:[], correct:0, total:0, feedback:'' };
+  if (screen===SCREENS.SNAKE) startGame();
+  saveProfile();
+}
+
+function loadWords(){
+  fetch('words.json', {cache:'no-store'})
+    .then(res => res.json())
+    .then(data => {
+      // data should be: { "Groceries":[...], "Travel":[...], ... }
+      TOPICS = data;
+      TOPIC_NAMES = Object.keys(TOPICS);
+      if (!TOPIC_NAMES.includes(currentTopic)) currentTopic = TOPIC_NAMES[0];
+      setTopic(currentTopic);
+      wordsReady = true;
+      draw();
+    })
+    .catch(err => console.error('Error loading words:', err));
+}
   function nextWord() {
     const w = WORDS[wordIndex % WORDS.length]; wordIndex++;
     return w;
