@@ -11,25 +11,28 @@
   /* Top control bar */
   #topControls {
     position:fixed; left:12px; top:12px; z-index:10;
-    display:flex; gap:10px; font:14px/1.2 system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto;
+    display:flex; gap:10px; flex-wrap:wrap;
+    font:14px/1.2 system-ui,-apple-system,BlinkMacSystemFont,Segoe UI,Roboto;
     color:#fff;
+    max-width:min(100vw - 24px, 1100px);
   }
   .pill {
     background:#0e1626; border:1px solid rgba(255,255,255,.15); border-radius:12px;
     padding:8px 10px; display:flex; gap:8px; align-items:center;
+    box-shadow:0 4px 16px rgba(0,0,0,.25);
   }
   .pill button, .pill select {
     background:#172034; color:#fff; border:1px solid rgba(255,255,255,.15);
     border-radius:8px; padding:6px 10px; cursor:pointer;
   }
   .pill button:hover { filter:brightness(1.1); }
-  .pill select { outline:none; }
-  #authStatus { opacity:.8; }
+  .pill select { outline:none; max-width:52vw; }
+  #authStatus { opacity:.8; white-space:nowrap; }
 </style>
 </head>
 <body>
 
-<!-- === Music / SFX / Difficulty / Auth =================================== -->
+<!-- === Music / SFX / Difficulty / Topic / Auth ============================ -->
 <div id="topControls">
   <div class="pill">
     <button id="musicBtn">🔈 Music</button>
@@ -44,6 +47,12 @@
       </select>
     </label>
     <span id="timerHint" style="opacity:.8"></span>
+  </div>
+  <!-- New: Topic picker -->
+  <div class="pill">
+    <label>Topic&nbsp;
+      <select id="topicSel"><option value="">Loading…</option></select>
+    </label>
   </div>
   <div class="pill">
     <span id="authStatus">未登入</span>
@@ -76,8 +85,15 @@
     CANVAS.height = Math.floor(window.innerHeight * DPR);
     CANVAS.style.width  = window.innerWidth + 'px';
     CANVAS.style.height = window.innerHeight + 'px';
+    draw(); // keep layout clean on rotate/resize
   }
   window.addEventListener('resize', resize);
+
+  // Safe top inset in canvas coordinates to avoid overlap with the fixed control bar
+  function topInset() {
+    const el = document.getElementById('topControls');
+    return ((el?.offsetHeight || 0) + 24) * DPR; // 24px extra spacing
+  }
 
   const TODAY = () => new Date().toISOString().slice(0,10); // YYYY-MM-DD
   const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
@@ -108,8 +124,7 @@
     document.getElementById('modeSel').value = currentMode;
     document.getElementById('timerHint').textContent = MODES[currentMode].label;
     if (game) game.tickMs = MODES[currentMode].snakeTick;
-    // switch vocab by mode (fallback to easy)
-    loadModeWords(currentMode);
+    loadModeWords(currentMode); // switch vocab by mode
   }
   document.getElementById('modeSel').addEventListener('change', e=> setMode(e.target.value));
 
@@ -145,9 +160,18 @@
   };
   updateMusicUI(); updateSfxUI();
 
+  // Unlock audio on first user interaction (mobile autoplay fix)
+  function unlockAudioOnce(){
+    if (musicOn) { A.bgm.play().catch(()=>{}); }
+    window.removeEventListener('pointerdown', unlockAudioOnce);
+    window.removeEventListener('keydown', unlockAudioOnce);
+  }
+  window.addEventListener('pointerdown', unlockAudioOnce, { once:true });
+  window.addEventListener('keydown', unlockAudioOnce, { once:true });
+
   // ====== (Optional) Firebase Auth + Cloud Save ==============================
   const FIREBASE_CONFIG = {
-    // 🔧 FILL THESE OR LEAVE EMPTY TO STAY OFFLINE:
+    // Leave empty to stay offline, or fill with your project settings.
     // apiKey: "YOUR_API_KEY",
     // authDomain: "YOUR_PROJECT.firebaseapp.com",
     // projectId: "YOUR_PROJECT_ID",
@@ -206,17 +230,14 @@
     catch { return newProfile(); }
   }
   async function loadProfileFromCloudMerge(){
-    // Merge cloud & local; prefer the most recently updated
     const local = loadProfileLocal();
     try{
       const ref = fb.db.collection('nightmarket_profiles').doc(fb.user.uid);
       const snap = await ref.get();
       let cloud = snap.exists ? snap.data() : null;
       let chosen = local;
-      if (cloud){
-        chosen = (cloud.updatedAt||0) > (local.updatedAt||0) ? cloud : local;
-      }
-      profile = ensureStreak(chosen); saveProfile(); // save back to both
+      if (cloud){ chosen = (cloud.updatedAt||0) > (local.updatedAt||0) ? cloud : local; }
+      profile = ensureStreak(chosen); saveProfile();
     }catch(e){ /* stay local */ }
     draw();
   }
@@ -246,19 +267,39 @@
   // ====== Vocabulary (by mode) ===============================================
   let TOPICS = {};          // { "Groceries": [ {en, zh}, ... ], ... }
   let TOPIC_NAMES = [];
-  let currentTopic = 'Groceries';
+  let currentTopic = '';
   let WORDS = [];
   let wordsReady = false;
   let wordIndex = 0;
 
+  const topicSel = document.getElementById('topicSel');
+
+  function refreshTopicSelect(){
+    topicSel.innerHTML = '';
+    TOPIC_NAMES.forEach(name=>{
+      const o = document.createElement('option');
+      o.value = name; o.textContent = name;
+      topicSel.appendChild(o);
+    });
+    if (!TOPIC_NAMES.length){
+      const o = document.createElement('option');
+      o.value=''; o.textContent='No topics';
+      topicSel.appendChild(o);
+    }
+    topicSel.value = currentTopic || TOPIC_NAMES[0] || '';
+  }
+
   function setTopic(name){
+    if (!name) return;
     currentTopic = name;
     WORDS = (TOPICS[name] || []).slice();
     wordIndex = 0;
+    topicSel.value = name;            // keep UI in sync
     flash = { deck: shuffle([...WORDS]), showBack:false, current:null, lastFlip:0 };
     quiz  = { q:null, options:[], correct:0, total:0, feedback:'', deadline:0, lastSecond:null };
     if (screen===SCREENS.SNAKE) startGame();
     saveProfile();
+    draw();
   }
 
   async function loadModeWords(mode){
@@ -275,18 +316,22 @@
       TOPICS = data;
       TOPIC_NAMES = Object.keys(TOPICS);
       if (!TOPIC_NAMES.length) throw 1;
-      if (!TOPIC_NAMES.includes(currentTopic)) currentTopic = TOPIC_NAMES[0];
+      if (!currentTopic || !TOPIC_NAMES.includes(currentTopic)) currentTopic = TOPIC_NAMES[0];
+      refreshTopicSelect();
       setTopic(currentTopic);
       wordsReady = true;
-      draw();
     }catch{
-      if (url.endsWith('words.json')) { return; }
-      // fallback to easy
-      currentMode = 'easy'; document.getElementById('modeSel').value = 'easy';
-      document.getElementById('timerHint').textContent = MODES.easy.label;
-      await loadModeWords('easy');
+      if (!url.endsWith('words.json')){ // fallback to easy
+        currentMode = 'easy';
+        document.getElementById('modeSel').value = 'easy';
+        document.getElementById('timerHint').textContent = MODES.easy.label;
+        await loadModeWords('easy');
+      } else {
+        TOPICS={}; TOPIC_NAMES=[]; refreshTopicSelect();
+      }
     }
   }
+  topicSel.addEventListener('change', e=> setTopic(e.target.value));
 
   function nextWord() {
     if (!WORDS.length) return { en: 'loading…', zh: '載入中…' };
@@ -299,7 +344,6 @@
   function pickVoice(){
     try{
       const voices = speechSynthesis.getVoices() || [];
-      // some nicer voices on Chrome/Android/iOS
       const prefer = [
         /Google US English/i, /Samantha/i, /Victoria/i, /Daniel/i, /Karen/i, /Serena/i, /English \(US\)/i
       ];
@@ -318,9 +362,8 @@
     try {
       const u = new SpeechSynthesisUtterance(enWord);
       u.lang = 'en-US';
-      // slightly vary to feel less robotic
-      u.rate = 0.92 + Math.random()*0.12; // 0.92–1.04
-      u.pitch = 0.95 + Math.random()*0.13; // 0.95–1.08
+      u.rate = 0.92 + Math.random()*0.12;
+      u.pitch = 0.95 + Math.random()*0.13;
       if (preferredVoice) u.voice = preferredVoice;
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(u);
@@ -332,8 +375,7 @@
   let screen = SCREENS.MENU;
   let hoverId = null;
 
-  // GLOBAL buttons map
-  const buttons = {};
+  const buttons = {}; // global button hit areas
 
   // ====== UI primitives on Canvas ============================================
   function drawBg() {
@@ -344,17 +386,17 @@
     CTX.fillStyle = g; CTX.fillRect(0,0,w,h);
 
     // Lantern strings
-    const rows = 4, cols = 10;
+    const rows = 3, cols = 9; // reduced to declutter
     for (let r=0;r<rows;r++){
-      const y = (h*0.12) + r*(h*0.12);
+      const y = (h*0.14) + r*(h*0.14);
       CTX.strokeStyle = COL.line; CTX.lineWidth = 2*DPR;
       CTX.beginPath(); CTX.moveTo(w*0.05,y);
-      CTX.quadraticCurveTo(w*0.5,y + (r%2?20:-20)*DPR, w*0.95, y);
+      CTX.quadraticCurveTo(w*0.5,y + (r%2?18:-18)*DPR, w*0.95, y);
       CTX.stroke();
       for (let c=0;c<cols;c++){
         const t = c/(cols-1);
         const x = lerp(w*0.05, w*0.95, t);
-        drawLantern(x,y + (r%2?12:-12)*DPR, (r%2?1:0));
+        drawLantern(x,y + (r%2?10:-10)*DPR, (r%2?1:0));
       }
     }
   }
@@ -383,10 +425,10 @@
     CTX.font = `${32*DPR}px sans-serif`;
     CTX.fillStyle = COL.white;
     CTX.textAlign = 'center';
-    CTX.fillText('英語夜市 · English Night Market', w/2, 60*DPR);
+    CTX.fillText('英語夜市 · English Night Market', w/2, topInset() + 40*DPR);
     CTX.font = `${16*DPR}px sans-serif`;
     CTX.fillStyle = COL.faint;
-    CTX.fillText('學英文 · 玩遊戲 · 每日進步', w/2, 90*DPR);
+    CTX.fillText('學英文 · 玩遊戲 · 每日進步', w/2, topInset() + 70*DPR);
   }
   function btnRect(cx, cy, w, h){ return {x:cx-w/2, y:cy-h/2, w, h}; }
   function drawButton(id, rect, label, sublabel=null) {
@@ -394,7 +436,7 @@
     CTX.save();
     CTX.translate(rect.x, rect.y);
     const r = 16*DPR;
-    CTX.globalAlpha = isHover?1:0.95;
+    CTX.globalAlpha = isHover?1:0.96;
     CTX.fillStyle = isHover?COL.jade:COL.card;
     roundedRect(0,0,rect.w,rect.h,r); CTX.fill();
     CTX.lineWidth = 2*DPR; CTX.strokeStyle = COL.line; CTX.stroke();
@@ -439,62 +481,30 @@
     CTX.restore();
   }
 
-  // ====== Dashboard top bar + Topic picker ===================================
+  // ====== Dashboard top bar (stats only; topic is in HTML select) ============
   function drawTopBar(){
     const w = CANVAS.width, h = CANVAS.height;
+    const yTop = topInset() + 86*DPR;
     const day = profile.daily[TODAY()] || {xp:0,words:0,games:0};
-    drawStatPill(w*0.07, h*0.08, 'Streak 連續天數', profile.streak, COL.gold);
-    drawStatPill(w*0.25, h*0.08, 'XP 今日經驗', day.xp||0, COL.green);
-    drawStatPill(w*0.41, h*0.08, 'Words 單字', day.words||0, COL.blue);
-    drawStatPill(w*0.57, h*0.08, 'High Score 遊戲高分', profile.highScore||0, COL.pink);
-
-    if (TOPIC_NAMES.length){
-      const y = h*0.08;
-      const label = `主題 Topic：${currentTopic}`;
-      CTX.font = `${12*DPR}px sans-serif`;
-      const m = CTX.measureText(label);
-      const pad = 12*DPR, pillW = m.width + pad*2, pillH = 24*DPR;
-      const xCenter = w*0.84;
-      const rx = xCenter - pillW/2, ry = y - pillH/2;
-      CTX.fillStyle = 'rgba(0,0,0,0.35)';
-      roundedRect(rx, ry, pillW, pillH, 12*DPR); CTX.fill();
-      CTX.strokeStyle = COL.jade; CTX.lineWidth = 2*DPR; CTX.stroke();
-      CTX.fillStyle = COL.white; CTX.textAlign='center';
-      CTX.fillText(label, xCenter, y + 4*DPR);
-
-      const aw = 22*DPR, ah = pillH;
-      const left  = {x: rx - aw - 6*DPR, y: ry, w: aw, h: ah};
-      const right = {x: rx + pillW + 6*DPR, y: ry, w: aw, h: ah};
-      buttons['topicPrev'] = left; buttons['topicNext'] = right;
-      drawMiniArrow(left,'left'); drawMiniArrow(right,'right');
-    }
-  }
-  function drawMiniArrow(rect, dir){
-    CTX.save();
-    CTX.translate(rect.x, rect.y);
-    CTX.fillStyle = 'rgba(0,0,0,0.35)';
-    roundedRect(0,0,rect.w,rect.h,8*DPR); CTX.fill();
-    CTX.strokeStyle = COL.line; CTX.lineWidth = 2*DPR; CTX.stroke();
-    CTX.fillStyle = COL.white;
-    CTX.beginPath();
-    const cx = rect.w/2, cy = rect.h/2, d = 6*DPR;
-    if (dir==='left'){ CTX.moveTo(cx+d,cy-d); CTX.lineTo(cx-d,cy); CTX.lineTo(cx+d,cy+d); }
-    else { CTX.moveTo(cx-d,cy-d); CTX.lineTo(cx+d,cy); CTX.lineTo(cx-d,cy+d); }
-    CTX.closePath(); CTX.fill();
-    CTX.restore();
+    drawStatPill(w*0.10, yTop, 'Streak 連續天數', profile.streak, COL.gold);
+    drawStatPill(w*0.30, yTop, 'XP 今日經驗', day.xp||0, COL.green);
+    drawStatPill(w*0.50, yTop, 'Words 單字', day.words||0, COL.blue);
+    drawStatPill(w*0.70, yTop, 'High Score 遊戲高分', profile.highScore||0, COL.pink);
   }
 
   // ====== MENU Screen ========================================================
   function drawMenu(){
     drawBg(); drawTitle(); buttonsClear(); drawTopBar();
     const w = CANVAS.width, h = CANVAS.height;
+    const sectionTop = topInset() + 150*DPR;
+
     const B = [
-      {id:'toDash',   y: h*0.28, label:'📊 進度儀表板 Dashboard', sub:'每日目標 · 單字完成度'},
-      {id:'toFlash',  y: h*0.40, label:'🃏 單字閃卡 Flashcards',    sub:'翻轉卡片 · 認知加強'},
-      {id:'toQuiz',   y: h*0.52, label:'📝 測驗 Quizzes',           sub:'選擇題 · 即時得分'},
-      {id:'toSnake',  y: h*0.64, label:'🛒 阿嬤買菜遊戲 (Snake)',     sub:'方向鍵操控 · 撿到就發音'},
+      {id:'toDash',   y: sectionTop +  40*DPR, label:'📊 進度儀表板 Dashboard', sub:'每日目標 · 單字完成度'},
+      {id:'toFlash',  y: sectionTop + 140*DPR, label:'🃏 單字閃卡 Flashcards',    sub:'翻轉卡片 · 認知加強'},
+      {id:'toQuiz',   y: sectionTop + 240*DPR, label:'📝 測驗 Quizzes',           sub:'選擇題 · 即時得分'},
+      {id:'toSnake',  y: sectionTop + 340*DPR, label:'🛒 阿嬤買菜遊戲 (Snake)',     sub:'方向鍵操控 · 撿到就發音'},
     ];
-    const rectW = Math.min(w*0.7, 740*DPR), rectH = 68*DPR;
+    const rectW = Math.min(w*0.72, 740*DPR), rectH = 68*DPR;
     B.forEach((b)=>{
       const rect = btnRect(w/2, b.y, rectW, rectH);
       buttons[b.id] = rect;
@@ -502,17 +512,18 @@
     });
     const today = profile.daily[TODAY()] || {xp:0};
     const pct = clamp((today.xp||0)/100,0,1);
-    drawProgressRing(w*0.85, h*0.25, 48*DPR, pct, `今日XP ${today.xp||0}/100`);
+    drawProgressRing(w*0.85, sectionTop - 50*DPR, 48*DPR, pct, `今日XP ${today.xp||0}/100`);
   }
 
   // ====== DASH Screen =========================================================
   function drawDash(){
     drawBg(); drawTitle(); buttonsClear(); drawTopBar();
     const w = CANVAS.width, h = CANVAS.height;
+    const startY = topInset() + 170*DPR;
 
-    function card(x,y,ww,hh, title, lines) {
-      CTX.save();
-      CTX.translate(x,y);
+    function card(cx, y, ww, hh, title, lines) {
+      const x = cx - ww/2;
+      CTX.save(); CTX.translate(x,y);
       CTX.fillStyle = COL.card;
       roundedRect(0,0,ww,hh,18*DPR); CTX.fill();
       CTX.strokeStyle = COL.line; CTX.lineWidth = 2*DPR; CTX.stroke();
@@ -526,29 +537,24 @@
     }
 
     const today = profile.daily[TODAY()] || {xp:0,words:0,games:0};
-    card(w*0.15, h*0.25, w*0.30, h*0.30,
-      '今日任務',
-      [
-        `完成 30 XP：${today.xp>=30?'✅ 完成':'⬜ 進行中'}`,
-        `學 10 字：${today.words>=10?'✅ 完成':`⬜ ${today.words||0}/10`}`,
-        `玩阿嬤買菜 1 局：${today.games>=1?'✅ 完成':'⬜ 尚未'}`
-      ]
-    );
-    card(w*0.55, h*0.25, w*0.30, h*0.30,
-      '總覽',
-      [
-        `註冊日期：${profile.createdAt}`,
-        `累積 XP：${profile.xp}`,
-        `已學單字：${profile.learnedWords.length}`
-      ]
-    );
+    const ww = Math.min(w*0.36, 520*DPR), hh = 160*DPR;
+    card(w*0.30, startY, ww, hh, '今日任務', [
+      `完成 30 XP：${today.xp>=30?'✅ 完成':'⬜ 進行中'}`,
+      `學 10 字：${today.words>=10?'✅ 完成':`⬜ ${today.words||0}/10`}`,
+      `玩阿嬤買菜 1 局：${today.games>=1?'✅ 完成':'⬜ 尚未'}`
+    ]);
+    card(w*0.70, startY, ww, hh, '總覽', [
+      `註冊日期：${profile.createdAt}`,
+      `累積 XP：${profile.xp}`,
+      `已學單字：${profile.learnedWords.length}`
+    ]);
 
-    const rectW = Math.min(w*0.7, 740*DPR), rectH = 60*DPR, y0 = h*0.66;
+    const rectW = Math.min(w*0.7, 740*DPR), rectH = 60*DPR, y0 = startY + hh + 80*DPR;
     [
-      {id:'backMenu',    y: y0, label:'← 返回目錄 Menu'},
-      {id:'toFlash',     y: y0+80*DPR, label:'🃏 開始閃卡'},
-      {id:'toQuiz',      y: y0+160*DPR,label:'📝 開始測驗'},
-      {id:'toSnake',     y: y0+240*DPR,label:'🛒 開始阿嬤買菜'}
+      {id:'backMenu', y:y0 +   0*DPR, label:'← 返回目錄 Menu'},
+      {id:'toFlash',  y:y0 + 100*DPR, label:'🃏 開始閃卡'},
+      {id:'toQuiz',   y:y0 + 200*DPR, label:'📝 開始測驗'},
+      {id:'toSnake',  y:y0 + 300*DPR, label:'🛒 開始阿嬤買菜'}
     ].forEach(b=>{
       const rect = btnRect(w/2, b.y, rectW, rectH);
       buttons[b.id]=rect; drawButton(b.id, rect, b.label);
@@ -561,13 +567,10 @@
   function drawFlash(){
     drawBg(); drawTitle(); buttonsClear(); drawTopBar();
     const w = CANVAS.width, h = CANVAS.height;
-    if (!flash.current) {
-      flash.deck = shuffle([...WORDS]);
-      flash.current = flash.deck[0] || null;
-    }
+    if (!flash.current) { flash.deck = shuffle([...WORDS]); flash.current = flash.deck[0] || null; }
 
     const cw = Math.min(520*DPR, w*0.8), ch = Math.min(320*DPR, h*0.5);
-    const cx = w/2 - cw/2, cy = h*0.3;
+    const cx = w/2 - cw/2, cy = topInset() + 190*DPR;
     CTX.save();
     CTX.translate(cx, cy);
     CTX.fillStyle = COL.card;
@@ -598,7 +601,7 @@
     drawButton('flashFlip', b1, '🔄 翻面 / Flip');
     drawButton('flashKnow', b2, '✅ 我會了 / I knew it');
     drawButton('flashPractice', b3, '🧠 需要多練 / Need practice');
-    const back = btnRect(w*0.15, h*0.9, 220*DPR, 50*DPR);
+    const back = btnRect(w*0.16, h - 60*DPR, 220*DPR, 50*DPR);
     buttons['backMenu']=back; drawButton('backMenu', back, '← 返回 Menu');
   }
   function flashFlip(){ flash.showBack = !flash.showBack; }
@@ -632,21 +635,21 @@
     drawBg(); drawTitle(); buttonsClear(); drawTopBar();
     const w = CANVAS.width, h = CANVAS.height;
     if (!quiz.q) genQuiz();
-    CTX.textAlign='center';
     const cw = Math.min(520*DPR,w*0.8), ch = 140*DPR;
-    const cx = w/2 - cw/2, cy = h*0.25;
+    const cx = w/2 - cw/2, cy = topInset() + 170*DPR;
     CTX.save();
     CTX.translate(cx, cy);
     CTX.fillStyle = COL.card; roundedRect(0,0,cw,ch,20*DPR); CTX.fill();
     CTX.strokeStyle = COL.line; CTX.lineWidth = 2*DPR; CTX.stroke();
     CTX.fillStyle = COL.white; CTX.font = `${28*DPR}px sans-serif`;
+    CTX.textAlign='center';
     CTX.fillText(`請選出「${quiz.q.en}」的中文意思`, cw/2, ch/2 + 8*DPR);
     CTX.restore();
 
-    // countdown
     const seconds = Math.ceil(timeLeftMs()/1000);
     CTX.fillStyle = seconds<=3 ? COL.red : COL.white;
     CTX.font = `${24*DPR}px sans-serif`;
+    CTX.textAlign='center';
     CTX.fillText(`⏱ ${seconds}s`, w/2, cy - 24*DPR);
 
     const bw = Math.min(660*DPR, w*0.9), bh = 56*DPR, y0 = cy+ch+60*DPR;
@@ -657,15 +660,15 @@
     });
 
     CTX.fillStyle = COL.faint; CTX.font = `${14*DPR}px sans-serif`;
-    CTX.fillText(`得分 ${quiz.correct}/${quiz.total}`, w/2, h*0.85);
+    CTX.fillText(`得分 ${quiz.correct}/${quiz.total}`, w/2, h*0.90);
 
-    const back = btnRect(w*0.15, h*0.9, 220*DPR, 50*DPR);
+    const back = btnRect(w*0.16, h - 60*DPR, 220*DPR, 50*DPR);
     buttons['backMenu']=back; drawButton('backMenu', back, '← 返回 Menu');
 
     if (quiz.feedback){
       CTX.fillStyle = quiz.feedback.startsWith('✅')?COL.jade:COL.red;
       CTX.font = `${18*DPR}px sans-serif`;
-      CTX.fillText(quiz.feedback, w/2, h*0.8);
+      CTX.fillText(quiz.feedback, w/2, h*0.84);
     }
   }
   function quizChoose(idx){
@@ -686,20 +689,18 @@
   }
 
   // ====== GRANDMA SNAKE GAME ==================================================
-  const GRID = { cols: 26, rows: 18, size: 28 };
   let game = null;
 
   function startGame(){
-    const cell = Math.floor(Math.min(CANVAS.width/(GRID.cols+6), CANVAS.height/(GRID.rows+6)));
-    const size = Math.max(18*DPR, cell);
+    const size = Math.max(18*DPR, Math.floor(Math.min(CANVAS.width/34, CANVAS.height/30)));
     const cols = Math.floor(CANVAS.width/size)-4;
-    const rows = Math.floor(CANVAS.height/size)-6;
+    const rows = Math.floor((CANVAS.height - topInset())/size)-7;
     game = {
       size, cols, rows,
       ox: Math.floor((CANVAS.width - cols*size)/2),
-      oy: Math.floor((CANVAS.height - rows*size)/2)+20*DPR,
+      oy: Math.floor((CANVAS.height - rows*size)/2) + 20*DPR,
       dir: {x:1,y:0}, nextDir: {x:1,y:0},
-      snake: [], grocery: null, tickMs: MODES[currentMode].snakeTick, elapsed: 0,
+      snake: [], grocery: null, tickMs: MODES[currentMode].snakeTick,
       lastTick: performance.now(), alive: true, score: 0,
       wordOnPickup: null, started: false, paused: false
     };
@@ -900,14 +901,6 @@
     draw();
   });
 
-  function cycleTopic(dir){
-    if (!TOPIC_NAMES.length) return;
-    const i = TOPIC_NAMES.indexOf(currentTopic);
-    const ni = (i + (dir==='next'?1:-1) + TOPIC_NAMES.length) % TOPIC_NAMES.length;
-    setTopic(TOPIC_NAMES[ni]);
-    draw();
-  }
-
   function handleButton(id){
     switch(id){
       case 'toDash': screen=SCREENS.DASH; break;
@@ -915,15 +908,11 @@
       case 'toQuiz': screen=SCREENS.QUIZ; break;
       case 'toSnake': screen=SCREENS.SNAKE; startGame(); break;
       case 'backMenu': screen=SCREENS.MENU; break;
-      case 'topicPrev': cycleTopic('prev'); return;
-      case 'topicNext': cycleTopic('next'); return;
-      case 'flashFlip': flashFlip(); break;
-      case 'flashKnow': flashAdvance(true); break;
-      case 'flashPractice': flashAdvance(false); break;
       default:
         if (id.startsWith('quizOpt')) {
           const idx = +id.replace('quizOpt','');
           quizChoose(idx);
+          return;
         }
     }
     draw();
