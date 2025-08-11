@@ -73,7 +73,6 @@
   function ensureStreak(p){
     const today = TODAY();
     if (p.lastDate !== today) {
-      // compute streak
       const prev = p.lastDate;
       const yday = new Date(); yday.setDate(yday.getDate()-1);
       const ystr = yday.toISOString().slice(0,10);
@@ -94,7 +93,7 @@
   let currentTopic = 'Groceries';
   let WORDS = [];
   let wordsReady = false;
-  let wordIndex = 0;        // <-- added
+  let wordIndex = 0;
 
   function setTopic(name){
     currentTopic = name;
@@ -108,10 +107,9 @@
   }
 
   function loadWords(){
-    fetch('words.json?v=2', {cache:'no-store'}) // <-- cache-bust
+    fetch('./words.json?v=3', {cache:'no-store'}) // cache-bust + relative
       .then(res => res.json())
       .then(data => {
-        // data should be: { "Groceries":[...], "Travel":[...], ... }
         TOPICS = data;
         TOPIC_NAMES = Object.keys(TOPICS);
         if (!TOPIC_NAMES.includes(currentTopic)) currentTopic = TOPIC_NAMES[0];
@@ -123,7 +121,7 @@
   }
 
   function nextWord() {
-    if (!WORDS.length) return { en: 'loading…', zh: '載入中…' }; // <-- safe while loading
+    if (!WORDS.length) return { en: 'loading…', zh: '載入中…' };
     const w = WORDS[wordIndex % WORDS.length]; wordIndex++;
     return w;
   }
@@ -161,7 +159,9 @@
     for (let r=0;r<rows;r++){
       const y = (h*0.12) + r*(h*0.12);
       CTX.strokeStyle = COL.line; CTX.lineWidth = 2*DPR;
-      CTX.beginPath(); CTX.moveTo(w*0.05,y); CTX.quadraticCurveTo(w*0.5,y + (r%2?20:-20)*DPR, w*0.95, y); CTX.stroke();
+      CTX.beginPath(); CTX.moveTo(w*0.05,y);
+      CTX.quadraticCurveTo(w*0.5,y + (r%2?20:-20)*DPR, w*0.95, y);
+      CTX.stroke();
       for (let c=0;c<cols;c++){
         const t = c/(cols-1);
         const x = lerp(w*0.05, w*0.95, t);
@@ -358,7 +358,7 @@
     CTX.textAlign='center';
     if (!flash.current){
       CTX.fillStyle = COL.faint; CTX.font = `${20*DPR}px sans-serif`;
-      CTX.fillText('載入單字中… Loading words…', cw/2, ch/2); // safe message
+      CTX.fillText('載入單字中… Loading words…', cw/2, ch/2);
     } else if (!flash.showBack){
       CTX.fillStyle = COL.white; CTX.font = `${32*DPR}px sans-serif`;
       CTX.fillText(flash.current.en, cw/2, ch/2);
@@ -385,15 +385,15 @@
   }
   function flashFlip(){ flash.showBack = !flash.showBack; }
   function flashAdvance(known){
-    if (known) grantXP(5);
-    else grantXP(3);
+    if (!flash.deck.length) return; // guard if words not loaded
+    if (known) grantXP(5); else grantXP(3);
     const cur = flash.current;
     if (known && cur && !profile.learnedWords.includes(cur.en)){
       profile.learnedWords.push(cur.en);
       incToday('words',1);
     }
     flash.deck.push(flash.deck.shift());
-    flash.current = flash.deck[0];
+    flash.current = flash.deck[0] || null;
     flash.showBack=false;
     saveProfile();
   }
@@ -658,7 +658,6 @@
   }
 
   // ====== Input handling ======================================================
-  const buttons = {}; // (moved here originally; keeping same)
   CANVAS.addEventListener('mousemove', (e)=>{
     const rect = CANVAS.getBoundingClientRect();
     const x = (e.clientX - rect.left)*DPR;
@@ -713,7 +712,7 @@
 
   // ====== Main draw loop ======================================================
   function draw() {
-    hoverId = hoverId;
+    // hoverId no-op intentional to preserve scope
     buttonsClear();
 
     switch(screen){
@@ -736,7 +735,7 @@
 
   // ====== Boot ================================================================
   resize();
-  loadWords();           // <-- added: load JSON
+  loadWords();
   draw();
   requestAnimationFrame(tick);
   CANVAS.focus();
