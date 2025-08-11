@@ -100,11 +100,22 @@
 <div id="pickup"><div class="en"></div><div class="zh"></div><div class="hint">＋5 XP · 已唸出發音</div></div>
 
 <!-- Audio -->
-<audio id="bgm" src="./audio/bgm.mp3" loop preload="auto" crossorigin="anonymous"></audio>
+<audio id="bgm" src="./audio/sb_adriftamonginfinitestars(chosic.com).mp3" loop preload="auto" muted></audio>
 <audio id="sfxCorrect" src="./audio/correct.mp3" preload="auto" crossorigin="anonymous"></audio>
 <audio id="sfxWrong"   src="./audio/wrong.mp3"   preload="auto" crossorigin="anonymous"></audio>
 <audio id="sfxTick"    src="./audio/tick.mp3"    preload="auto" crossorigin="anonymous"></audio>
 
+<script>
+  function unmuteAndPlayOnce() {
+    const bgm = document.getElementById('bgm');
+    bgm.muted = false;
+    bgm.play().catch(()=>{});
+    window.removeEventListener('pointerdown', unmuteAndPlayOnce);
+    window.removeEventListener('keydown', unmuteAndPlayOnce);
+  }
+  window.addEventListener('pointerdown', unmuteAndPlayOnce, { once:true });
+  window.addEventListener('keydown',  unmuteAndPlayOnce, { once:true });
+</script>
 <canvas id="app" tabindex="0" aria-label="English Night Market"></canvas>
 
 <!-- Firebase（可選；不填就維持離線） -->
@@ -193,7 +204,7 @@
     bad: document.getElementById('sfxWrong'),
     tick:document.getElementById('sfxTick')
   };
-  let musicOn = localStorage.getItem('nm_music')==='1';
+  let musicOn = (localStorage.getItem('nm_music') ?? '1') === '1';
   let sfxOn = localStorage.getItem('nm_sfx')==='1';
   function updateMusicUI(){ document.getElementById('musicBtn').textContent = musicOn ? '🔊 Music' : '🔈 Music'; }
   function updateSfxUI(){ document.getElementById('sfxBtn').textContent = sfxOn ? '🔔 SFX' : '🔕 SFX'; }
@@ -204,16 +215,7 @@
   };
   document.getElementById('sfxBtn').onclick = ()=>{ sfxOn=!sfxOn; localStorage.setItem('nm_sfx', sfxOn?'1':'0'); updateSfxUI(); };
   updateMusicUI(); updateSfxUI();
-
-  // 必須互動一次才能播
-  function unlockAudioOnce(){
-    if (musicOn) { A.bgm.play().catch(()=>{}); }
-    window.removeEventListener('pointerdown', unlockAudioOnce);
-    window.removeEventListener('keydown', unlockAudioOnce);
-  }
-  window.addEventListener('pointerdown', unlockAudioOnce, { once:true });
-  window.addEventListener('keydown',  unlockAudioOnce, { once:true });
-
+  
   // ====== Firebase（可選） ====================================================
   const FIREBASE_CONFIG = {
     // 如果要登入：把下列四行填滿（Firebase Console > 專案設定 > Web App）
