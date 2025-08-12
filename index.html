@@ -775,7 +775,13 @@ const wwRecent  = Math.min(w * 0.72, 740 * DPR);
 const titleH     = 30 * DPR;
 const lineHeight = 20 * DPR;   // 和 card 的 i*20*DPR 對齊
 const pad        = 20 * DPR;
+// 先決定要顯示的幾行 + 算出卡片高度
+const maxLines = Math.max(1, Math.min(7, Math.floor((300 * DPR - (pad * 2 + titleH)) / lineHeight)));
+const linesShown = linesAll.slice(-maxLines);
+const hhRecent = Math.min(300 * DPR, pad * 2 + titleH + linesShown.length * lineHeight);
 
+// 把「最近 7 天」卡片畫出來（在按鈕之上）
+card(w * 0.50, yRecent, wwRecent, hhRecent, '最近 7 天', linesShown);
 // === 計算最近 7 天卡可用高度，保留下面按鈕空間 ===
 // === 自適應按鈕區：一定塞得下畫面 ===
 const rectW  = Math.min(w * 0.7, 740 * DPR);
