@@ -779,7 +779,8 @@ const pad        = 20 * DPR;
 // 底下按鈕區需求高度（3 個按鈕 + 兩個 100 的間距 + 底部留白）
 const rectW  = Math.min(w * 0.7, 740 * DPR);
 const rectH  = 60 * DPR;
-const btnBlockH = rectH * 3 + 100 * DPR * 2 + 80 * DPR;
+const totalButtons = 4;
+const btnBlockH = rectH * totalButtons + 100 * DPR * (totalButtons - 1) + 80 * DPR;
 
 // 這張卡最多可用高度（不能把按鈕擠出畫面）
 const maxHRecent = Math.max(120 * DPR, CANVAS.height - (yRecent + 60 * DPR + btnBlockH));
