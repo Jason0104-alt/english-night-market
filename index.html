@@ -672,7 +672,7 @@ function sfxTick(){  // 滴答：短促高頻
       saveProfile(); speakWord(word.en); game.grocery=spawnGrocery(); game.tickMs=Math.max(70, game.tickMs-1.4);
     }else{ game.snake.pop(); }
   }
-  function gameOver(){ game.alive=false; grantXP(3); saveProfile();
+  function gameOver(){ 
   // ➊ 記錄今天最高分
   const d = TODAY();
   const best = Math.max(dailyScores[d] || 0, game.score);
