@@ -764,37 +764,52 @@ function getRecentScores(n = 7){
       `已學單字：${profile.learnedWords.length}`
     ]);
     
-    // ==== 最近 7 天分數卡（自動縮排，不擋到下面按鈕） ====
+// ==== 最近 7 天分數卡（保證下面按鈕一定有空間） ====
 const recentAll = getRecentScores(7);
 let linesAll = recentAll.map(r => `${formatMD(r.date)}：${(r.score ?? 0)} 分`);
 
 const yRecent   = startY + hh + 40 * DPR;
 const wwRecent  = Math.min(w * 0.72, 740 * DPR);
 
-// 與 card() 內排版一致
+// 卡片基本排版參數
 const titleH     = 30 * DPR;
-const lineHeight = 20 * DPR;   // 和 card 的 i*20*DPR 對齊
+const lineHeight = 20 * DPR;
 const pad        = 20 * DPR;
-// 先決定要顯示的幾行 + 算出卡片高度
-const maxLines = Math.max(1, Math.min(7, Math.floor((300 * DPR - (pad * 2 + titleH)) / lineHeight)));
-const linesShown = linesAll.slice(-maxLines);
-const hhRecent = Math.min(300 * DPR, pad * 2 + titleH + linesShown.length * lineHeight);
 
-// 把「最近 7 天」卡片畫出來（在按鈕之上）
+// === 下面按鈕區的「最小需求」 ===
+const totalButtons = 4;
+const bottomPad = 18 * DPR;
+const minBtnH = 46 * DPR;
+const minGap  = 12 * DPR;
+const minButtonsBlock = totalButtons * minBtnH + (totalButtons - 1) * minGap + bottomPad;
+
+// 這一頁還剩多少垂直空間可以用在「最近 7 天卡片 + 按鈕」
+const pageAvail = CANVAS.height - yRecent;
+
+// 先預留按鈕的最小空間，剩下才給「最近 7 天」卡片
+let recentAvail = Math.max(80 * DPR, pageAvail - minButtonsBlock); // 至少留一點高度
+let maxRecentH  = Math.min(300 * DPR, recentAvail);
+
+// 依可用高度決定可顯示的行數，必要時縮減行數
+let maxLines = Math.floor((maxRecentH - (pad * 2 + titleH)) / lineHeight);
+maxLines = Math.max(1, Math.min(7, maxLines));
+const linesShown = linesAll.slice(-maxLines);
+
+// 依行數回推實際卡片高度（不超過 maxRecentH）
+let hhRecent = pad * 2 + titleH + linesShown.length * lineHeight;
+hhRecent = Math.min(hhRecent, maxRecentH);
+
+// 畫卡片
 card(w * 0.50, yRecent, wwRecent, hhRecent, '最近 7 天', linesShown);
-// === 計算最近 7 天卡可用高度，保留下面按鈕空間 ===
+
 // === 自適應按鈕區：一定塞得下畫面 ===
 const rectW  = Math.min(w * 0.7, 740 * DPR);
-const bottomPad = 18 * DPR;
-const totalButtons = 4;
+let btnH = 60 * DPR,  maxBtnH = 64 * DPR;
+let gap  = 26 * DPR,  maxGap  = 36 * DPR;
 
 const avail = CANVAS.height - (yRecent + hhRecent) - bottomPad;
 
-// 想要的大小與下限
-let btnH = 60 * DPR,  minBtnH = 46 * DPR,  maxBtnH = 64 * DPR;
-let gap  = 26 * DPR,  minGap  = 12 * DPR,  maxGap  = 36 * DPR;
-
-// 若空間不夠：先縮間距，再縮按鈕高
+// 先把需要的高度算出來，再按需縮 gap / btnH
 (function fit(){
   let need = totalButtons * btnH + (totalButtons - 1) * gap;
   if (need <= avail) return;
@@ -814,12 +829,11 @@ let gap  = 26 * DPR,  minGap  = 12 * DPR,  maxGap  = 36 * DPR;
     btnH = Math.max(minBtnH, btnH - d2 / totalButtons);
   }
 
-  // 上限保護
   btnH = Math.min(btnH, maxBtnH);
   gap  = Math.min(gap,  maxGap);
 })();
 
-// 把整塊按鈕垂直置中在剩餘空間
+// 垂直置中剩餘空間（就算很擠也會出現）
 const used = totalButtons * btnH + (totalButtons - 1) * gap;
 const yStart = yRecent + hhRecent + Math.max(minGap, (avail - used) / 2);
 
