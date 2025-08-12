@@ -777,50 +777,54 @@ const lineHeight = 20 * DPR;   // 和 card 的 i*20*DPR 對齊
 const pad        = 20 * DPR;
 
 // === 計算最近 7 天卡可用高度，保留下面按鈕空間 ===
+// === 自適應按鈕區：一定塞得下畫面 ===
 const rectW  = Math.min(w * 0.7, 740 * DPR);
+const bottomPad = 18 * DPR;
 const totalButtons = 4;
 
-// 先算「最近 7 天」卡片能放多少行
-const desiredGapBetweenCardAndBtns = 50 * DPR;
-const minBottomPad = 16 * DPR;
-const availBelowRecent = CANVAS.height - (yRecent + desiredGapBetweenCardAndBtns) - minBottomPad;
+const avail = CANVAS.height - (yRecent + hhRecent) - bottomPad;
 
-// 先抓所有行數的卡片高度（上面已經有 titleH / pad / lineHeight）
-let hhRecent = Math.min(300 * DPR, pad * 2 + titleH + linesAll.length * lineHeight);
+// 想要的大小與下限
+let btnH = 60 * DPR,  minBtnH = 46 * DPR,  maxBtnH = 64 * DPR;
+let gap  = 26 * DPR,  minGap  = 12 * DPR,  maxGap  = 36 * DPR;
 
-// 估計按鈕區需要的高度（先用最大值）
-const maxBtnH = 60 * DPR, minBtnH = 48 * DPR;
-const desiredGap = 90 * DPR, minGap = 18 * DPR;
-let availForBtns = availBelowRecent - hhRecent;
-let needForBtnsAtMax = totalButtons * maxBtnH + (totalButtons - 1) * desiredGap;
+// 若空間不夠：先縮間距，再縮按鈕高
+(function fit(){
+  let need = totalButtons * btnH + (totalButtons - 1) * gap;
+  if (need <= avail) return;
 
-// 不夠的話就把卡片再縮短（但不低於 140）
-if (availForBtns < needForBtnsAtMax) {
-  const shrink = needForBtnsAtMax - availForBtns;
-  hhRecent = Math.max(140 * DPR, hhRecent - shrink);
-  availForBtns = availBelowRecent - hhRecent;
-}
+  const extra = need - avail;
+  const canShrinkGap = (gap - minGap) * (totalButtons - 1);
+  if (canShrinkGap > 0){
+    const d = Math.min(extra, canShrinkGap);
+    gap = Math.max(minGap, gap - d / (totalButtons - 1));
+  }
 
-// 真正要顯示的行數與卡片高度
-const maxLines = Math.max(1, Math.floor((hhRecent - (pad * 2 + titleH)) / lineHeight));
-const linesShown = linesAll.slice(-maxLines);
-hhRecent = Math.min(300 * DPR, pad * 2 + titleH + linesShown.length * lineHeight);
+  need = totalButtons * btnH + (totalButtons - 1) * gap;
+  if (need > avail){
+    const extra2 = need - avail;
+    const canShrinkBtn = (btnH - minBtnH) * totalButtons;
+    const d2 = Math.min(extra2, canShrinkBtn);
+    btnH = Math.max(minBtnH, btnH - d2 / totalButtons);
+  }
 
-// 畫卡片
-card(w * 0.50, yRecent, wwRecent, hhRecent, '最近 7 天', linesShown);
+  // 上限保護
+  btnH = Math.min(btnH, maxBtnH);
+  gap  = Math.min(gap,  maxGap);
+})();
 
-// === 自適應按鈕高度與間距，確保不出框 ===
-const btnH = clamp(availForBtns / (totalButtons + 0.8), minBtnH, maxBtnH);
-const gap  = Math.max(minGap, Math.min(desiredGap, (availForBtns - totalButtons * btnH) / (totalButtons - 1)));
+// 把整塊按鈕垂直置中在剩餘空間
+const used = totalButtons * btnH + (totalButtons - 1) * gap;
+const yStart = yRecent + hhRecent + Math.max(minGap, (avail - used) / 2);
 
-let yBtn = yRecent + hhRecent + gap / 2;
 [
   {id:'backMenu', label:'← 返回 Menu'},
   {id:'toFlash',  label:'🃏 開始閃卡'},
   {id:'toQuiz',   label:'📝 開始測驗'},
   {id:'toSnake',  label:'🛒 開始阿嬤買菜'}
 ].forEach((b, i) => {
-  const r = { x: w/2 - rectW/2, y: yBtn + i * (btnH + gap) - btnH / 2, w: rectW, h: btnH };
+  const centerY = yStart + i * (btnH + gap) + btnH / 2;
+  const r = { x: w/2 - rectW/2, y: centerY - btnH/2, w: rectW, h: btnH };
   buttons[b.id] = r;
   drawButton(b.id, r, b.label);
 });
