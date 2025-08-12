@@ -673,6 +673,13 @@ function sfxTick(){  // 滴答：短促高頻
     }else{ game.snake.pop(); }
   }
   function gameOver(){ game.alive=false; grantXP(3); saveProfile();
+  // ➊ 記錄今天最高分
+  const d = TODAY();
+  const best = Math.max(dailyScores[d] || 0, game.score);
+  dailyScores[d] = best;
+  saveDailyScores();
+
+  game.alive=false; grantXP(3); saveProfile();
     const w=CANVAS.width, h=CANVAS.height; CTX.fillStyle='rgba(0,0,0,0.5)'; CTX.fillRect(0,0,w,h);
     CTX.fillStyle=COL.white; CTX.textAlign='center'; CTX.font=`${28*DPR}px system-ui`; CTX.fillText('遊戲結束 · Game Over', w/2, h/2-30*DPR);
     CTX.font=`${18*DPR}px system-ui`; CTX.fillText(`分數 Score: ${game.score}   最高 High: ${profile.highScore}`, w/2, h/2+6*DPR);
