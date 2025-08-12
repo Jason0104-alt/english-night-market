@@ -170,32 +170,12 @@
     }
   }
   function drawTitle(){
-  const titleY = topInset() + 40 * DPR;
-  const subY   = titleY + 30 * DPR;
-
-  CTX.save();
-  CTX.textAlign = 'center';
-
-  // 標題：先描邊再填色，對比更高
-  CTX.font = `${32*DPR}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
-  CTX.lineWidth   = 4 * DPR;
-  CTX.lineJoin    = 'round';
-  CTX.miterLimit  = 2;
-  CTX.strokeStyle = 'rgba(0,0,0,0.55)';        // 黑色半透明外框
-  CTX.strokeText('英語夜市 · English Night Market', CANVAS.width/2, titleY);
-  CTX.fillStyle   = COL.white;                 // 內文白色
-  CTX.fillText('英語夜市 · English Night Market', CANVAS.width/2, titleY);
-
-  // 副標：也加一點描邊
-  CTX.font       = `${16*DPR}px system-ui`;
-  CTX.lineWidth  = 3 * DPR;
-  CTX.strokeStyle= 'rgba(0,0,0,0.5)';
-  CTX.strokeText('學英文 · 玩遊戲 · 每日進步', CANVAS.width/2, subY);
-  CTX.fillStyle  = COL.faint;
-  CTX.fillText('學英文 · 玩遊戲 · 每日進步', CANVAS.width/2, subY);
-
-  CTX.restore();
-}
+    CTX.font = `${32*DPR}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+    CTX.fillStyle=COL.white; CTX.textAlign='center';
+    CTX.fillText('英語夜市 · English Night Market', CANVAS.width/2, topInset()+40*DPR);
+    CTX.font = `${16*DPR}px system-ui`; CTX.fillStyle=COL.faint;
+    CTX.fillText('學英文 · 玩遊戲 · 每日進步', CANVAS.width/2, topInset()+70*DPR);
+  }
 
   // ====== Modes ===============================================================
   const MODES = {
