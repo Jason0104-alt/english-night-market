@@ -812,12 +812,6 @@ const y0 = yRecent + hhRecent + 60 * DPR;
   drawButton(b.id, r, b.label);
 });
 
-// 調整下面按鈕的起始 Y
-const rectW = Math.min(w*0.7, 740*DPR), rectH = 60*DPR;
-const y0    = yRecent + hhRecent + 60*DPR;
-    [{id:'backMenu',y:y0,label:'← 返回 Menu'},{id:'toFlash',y:y0+100*DPR,label:'🃏 開始閃卡'},{id:'toQuiz',y:y0+200*DPR,label:'📝 開始測驗'},{id:'toSnake',y:y0+300*DPR,label:'🛒 開始阿嬤買菜'}]
-      .forEach(b=>{ const r={x:w/2-rectW/2,y:b.y-rectH/2,w:rectW,h:rectH}; buttons[b.id]=r; drawButton(b.id,r,b.label); });
-  }
   function drawProgressRing(cx,cy,r,pct,label){
     CTX.save(); CTX.translate(cx,cy);
     CTX.lineWidth=10*DPR; CTX.strokeStyle='rgba(255,255,255,0.15)'; CTX.beginPath(); CTX.arc(0,0,r,0,Math.PI*2); CTX.stroke();
