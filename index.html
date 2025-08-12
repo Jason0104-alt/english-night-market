@@ -703,7 +703,7 @@ function sfxTick(){  // 滴答：短促高頻
     const rectW = Math.min(w*0.72, 740*DPR), rectH = 68*DPR;
     B.forEach(b=>{ const rect={x:w/2-rectW/2,y:b.y-rectH/2,w:rectW,h:rectH}; buttons[b.id]=rect; drawButton(b.id,rect,b.label,b.sub); });
     const today = profile.daily[TODAY()] || {xp:0}; const pct = clamp((today.xp||0)/100,0,1);
-    drawProgressRing(w*0.85, sectionTop - 50*DPR, 48*DPR, pct, `今日XP ${today.xp||0}/function shortenNumber(num) {
+    drawProgressRing(w*0.85, sectionTop - 50*DPR, 48*DPR, pct, `今日XP ${today.xp||0}/100`);
   const fmt = n => (n).toFixed(1).replace(/\.0$/, ''); // 去掉 .0
   if (num >= 1e9) return fmt(num / 1e9) + 'B';
   if (num >= 1e6) return fmt(num / 1e6) + 'M';
