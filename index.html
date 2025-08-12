@@ -705,6 +705,12 @@ function sfxTick(){  // 滴答：短促高頻
     const today = profile.daily[TODAY()] || {xp:0}; const pct = clamp((today.xp||0)/100,0,1);
     drawProgressRing(w*0.85, sectionTop - 50*DPR, 48*DPR, pct, `今日XP ${today.xp||0}/100`);
   }
+  function shortenNumber(num) {
+  if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
+  if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
+  if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+  return num;
+}
   function drawDash(){
     drawBg(); drawTitle(); buttonsClear(); drawTopBar();
     const w=CANVAS.width; const startY=topInset()+170*DPR;
@@ -723,7 +729,7 @@ function sfxTick(){  // 滴答：短促高頻
     ]);
     card(w*0.70,startY,ww,hh,'總覽',[
       `註冊日期：${profile.createdAt}`,
-      `累積 XP：${profile.xp}`,
+      `累積 XP：${shortenNumber(profile.xp)}`,
       `已學單字：${profile.learnedWords.length}`
     ]);
     const rectW=Math.min(w*0.7,740*DPR), rectH=60*DPR, y0=startY+hh+80*DPR;
