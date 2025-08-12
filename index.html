@@ -769,13 +769,24 @@ function getRecentScores(n = 7){
     const lines = recent.map(r => `${formatMD(r.date)}：${(r.score ?? '-') } 分`);
 
     // 位置與尺寸
-    const yRecent   = startY + hh + 40*DPR;
-    const wwRecent  = Math.min(w*0.72, 740*DPR);
-    const hhRecent  = 190*DPR; // 7 行比較安全
+const yRecent  = startY + hh + 40*DPR;
+const wwRecent = Math.min(w*0.72, 740*DPR);
 
-    card(w*0.50, yRecent, wwRecent, hhRecent, '最近 7 天', lines);
-    const rectW = Math.min(w*0.7, 740*DPR), rectH = 60*DPR;
-    const y0 = yRecent + hhRecent + 60*DPR;
+// 行距要跟 card() 的 20*DPR 一致
+const lineHeight = 20 * DPR;
+// 上下 padding
+const pad = 20 * DPR;
+// 最小高度（避免太矮）
+const minH = 130 * DPR;
+
+// 自動算高度（粗估：標題區 + 行數 * 行高 + padding）
+const hhRecent = Math.max(minH, pad * 2 + 30 * DPR + lines.length * lineHeight);
+
+card(w*0.50, yRecent, wwRecent, hhRecent, '最近 7 天', lines);
+
+// 調整下面按鈕的起始 Y
+const rectW = Math.min(w*0.7, 740*DPR), rectH = 60*DPR;
+const y0    = yRecent + hhRecent + 60*DPR;
     [{id:'backMenu',y:y0,label:'← 返回 Menu'},{id:'toFlash',y:y0+100*DPR,label:'🃏 開始閃卡'},{id:'toQuiz',y:y0+200*DPR,label:'📝 開始測驗'},{id:'toSnake',y:y0+300*DPR,label:'🛒 開始阿嬤買菜'}]
       .forEach(b=>{ const r={x:w/2-rectW/2,y:b.y-rectH/2,w:rectW,h:rectH}; buttons[b.id]=r; drawButton(b.id,r,b.label); });
   }
