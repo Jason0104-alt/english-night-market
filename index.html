@@ -474,6 +474,7 @@ function sfxTick(){  // 滴答：短促高頻
     if (!flash.current){ flash.deck=shuffle([...WORDS]); flash.current=flash.deck[0]||null; }
     const cw=Math.min(540*DPR,w*0.86), ch=Math.min(340*DPR,h*0.52);
     const cx=w/2 - cw/2, cy=topInset()+190*DPR;
+    flash.cardRect = { x: cx, y: cy, w: cw, h: ch };
     CTX.save(); CTX.translate(cx,cy);
     CTX.fillStyle=COL.card; roundedRect(0,0,cw,ch,24*DPR); CTX.fill(); CTX.strokeStyle=COL.line; CTX.lineWidth=2*DPR; CTX.stroke();
     CTX.textAlign='center';
@@ -820,6 +821,21 @@ function sfxTick(){  // 滴答：短促高頻
     requestAnimationFrame(tick);
     CANVAS.focus();
   }
+  CANVAS.addEventListener('click', (e)=>{
+  const rect = CANVAS.getBoundingClientRect();
+  const x = (e.clientX - rect.left) * DPR;
+  const y = (e.clientY - rect.top)  * DPR;
+
+  if (screen === SCREENS.FLASH && flash.cardRect){
+    const r = flash.cardRect;
+    if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h){
+      flipCard();
+      return;
+    }
+  }
+  if (!hoverId) return;
+  handleButton(hoverId);
+});
   init();
 })();
 </script>
