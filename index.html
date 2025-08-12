@@ -763,7 +763,19 @@ function getRecentScores(n = 7){
       `累積 XP：${shortenNumber(profile.xp)}`,
       `已學單字：${profile.learnedWords.length}`
     ]);
-    const rectW=Math.min(w*0.7,740*DPR), rectH=60*DPR, y0=startY+hh+80*DPR;
+    
+    // 最近 7 天分數卡
+    const recent = getRecentScores(7);
+    const lines = recent.map(r => `${formatMD(r.date)}：${(r.score ?? '-') } 分`);
+
+    // 位置與尺寸
+    const yRecent   = startY + hh + 40*DPR;
+    const wwRecent  = Math.min(w*0.72, 740*DPR);
+    const hhRecent  = 190*DPR; // 7 行比較安全
+
+    card(w*0.50, yRecent, wwRecent, hhRecent, '最近 7 天', lines);
+    const rectW = Math.min(w*0.7, 740*DPR), rectH = 60*DPR;
+    const y0 = yRecent + hhRecent + 60*DPR;
     [{id:'backMenu',y:y0,label:'← 返回 Menu'},{id:'toFlash',y:y0+100*DPR,label:'🃏 開始閃卡'},{id:'toQuiz',y:y0+200*DPR,label:'📝 開始測驗'},{id:'toSnake',y:y0+300*DPR,label:'🛒 開始阿嬤買菜'}]
       .forEach(b=>{ const r={x:w/2-rectW/2,y:b.y-rectH/2,w:rectW,h:rectH}; buttons[b.id]=r; drawButton(b.id,r,b.label); });
   }
