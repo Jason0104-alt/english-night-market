@@ -794,7 +794,10 @@ const maxLines = Math.max(
 const linesShown = linesAll.slice(-maxLines);
 
 // 依實際行數回推卡片高度
-const hhRecent = pad * 2 + titleH + linesShown.length * lineHeight;
+const hhRecent = Math.min(
+    300 * DPR, // 最大高度限制
+    pad * 2 + titleH + linesShown.length * lineHeight
+);
 
 // 畫卡片
 card(w * 0.50, yRecent, wwRecent, hhRecent, '最近 7 天', linesShown);
