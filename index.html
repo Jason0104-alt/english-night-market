@@ -364,6 +364,11 @@ function sfxTick(){  // 滴答：短促高頻
   }
   function incToday(key, by=1){ const t=TODAY(); if (!profile.daily[t]) profile.daily[t]={xp:0,words:0,games:0}; profile.daily[t][key]=(profile.daily[t][key]||0)+by; }
   function grantXP(v){ profile.xp+=v; incToday('xp', v); }
+  // ====== Daily Scores (per date) ==============================================
+  let dailyScores = JSON.parse(localStorage.getItem('dailyScores') || '{}');
+  function saveDailyScores(){
+  localStorage.setItem('dailyScores', JSON.stringify(dailyScores));
+}
 
   // ====== Words / Topic / Level ==============================================
   // 只讀 ./words.json；若沒讀到，用較完整的預設資料（多 Topic、多等級），避免只剩 apple
