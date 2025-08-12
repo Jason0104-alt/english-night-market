@@ -459,6 +459,15 @@ function sfxTick(){  // 滴答：短促高頻
   }
 
   let flash = { deck:[], showBack:false, current:null, lastFlip:0 };
+ function flipCard(){
+  if (!flash.current) return;
+  flash.showBack = !flash.showBack;
+  // 翻到背面（看到中文）就唸英文
+  if (flash.showBack && flash.current?.en){
+    speakWord(flash.current.en);
+  }
+  draw();
+}
   function drawFlash(){
     drawBg(); drawTitle(); buttonsClear(); drawTopBar();
     const w=CANVAS.width, h=CANVAS.height;
