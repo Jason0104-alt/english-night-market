@@ -776,43 +776,51 @@ const titleH     = 30 * DPR;
 const lineHeight = 20 * DPR;   // 和 card 的 i*20*DPR 對齊
 const pad        = 20 * DPR;
 
-// 底下按鈕區需求高度（3 個按鈕 + 兩個 100 的間距 + 底部留白）
+// === 計算最近 7 天卡可用高度，保留下面按鈕空間 ===
 const rectW  = Math.min(w * 0.7, 740 * DPR);
-const rectH  = 60 * DPR;
 const totalButtons = 4;
-const btnBlockH = rectH * totalButtons + 100 * DPR * (totalButtons - 1) + 80 * DPR;
 
-// 這張卡最多可用高度（不能把按鈕擠出畫面）
-const maxHRecent = Math.max(120 * DPR, CANVAS.height - (yRecent + 60 * DPR + btnBlockH));
+// 先算「最近 7 天」卡片能放多少行
+const desiredGapBetweenCardAndBtns = 50 * DPR;
+const minBottomPad = 16 * DPR;
+const availBelowRecent = CANVAS.height - (yRecent + desiredGapBetweenCardAndBtns) - minBottomPad;
 
-// 依可用高度，計算最多可顯示幾行
-const maxLines = Math.max(
-  1,
-  Math.floor((maxHRecent - (pad * 2 + titleH)) / lineHeight)
-);
+// 先抓所有行數的卡片高度（上面已經有 titleH / pad / lineHeight）
+let hhRecent = Math.min(300 * DPR, pad * 2 + titleH + linesAll.length * lineHeight);
 
-// 取最後面的幾天（越新的在下面）
+// 估計按鈕區需要的高度（先用最大值）
+const maxBtnH = 60 * DPR, minBtnH = 48 * DPR;
+const desiredGap = 90 * DPR, minGap = 18 * DPR;
+let availForBtns = availBelowRecent - hhRecent;
+let needForBtnsAtMax = totalButtons * maxBtnH + (totalButtons - 1) * desiredGap;
+
+// 不夠的話就把卡片再縮短（但不低於 140）
+if (availForBtns < needForBtnsAtMax) {
+  const shrink = needForBtnsAtMax - availForBtns;
+  hhRecent = Math.max(140 * DPR, hhRecent - shrink);
+  availForBtns = availBelowRecent - hhRecent;
+}
+
+// 真正要顯示的行數與卡片高度
+const maxLines = Math.max(1, Math.floor((hhRecent - (pad * 2 + titleH)) / lineHeight));
 const linesShown = linesAll.slice(-maxLines);
-
-// 依實際行數回推卡片高度
-const hhRecent = Math.min(
-    300 * DPR, // 最大高度限制
-    pad * 2 + titleH + linesShown.length * lineHeight
-);
+hhRecent = Math.min(300 * DPR, pad * 2 + titleH + linesShown.length * lineHeight);
 
 // 畫卡片
 card(w * 0.50, yRecent, wwRecent, hhRecent, '最近 7 天', linesShown);
 
-// 下面按鈕的 Y（依卡片高度往下排）
-const maxRecentHeight = 300 * DPR; // 限制最近7天卡片高度
-const y0 = yRecent + Math.min(hhRecent, maxRecentHeight) + 60 * DPR;
+// === 自適應按鈕高度與間距，確保不出框 ===
+const btnH = clamp(availForBtns / (totalButtons + 0.8), minBtnH, maxBtnH);
+const gap  = Math.max(minGap, Math.min(desiredGap, (availForBtns - totalButtons * btnH) / (totalButtons - 1)));
+
+let yBtn = yRecent + hhRecent + gap / 2;
 [
-  {id:'backMenu', y:y0,              label:'← 返回 Menu'},
-  {id:'toFlash',  y:y0 + 100 * DPR,  label:'🃏 開始閃卡'},
-  {id:'toQuiz',   y:y0 + 200 * DPR,  label:'📝 開始測驗'},
-  {id:'toSnake',  y:y0 + 300 * DPR,  label:'🛒 開始阿嬤買菜'}
-].forEach(b => {
-  const r = { x: w/2 - rectW/2, y: b.y - rectH/2, w: rectW, h: rectH };
+  {id:'backMenu', label:'← 返回 Menu'},
+  {id:'toFlash',  label:'🃏 開始閃卡'},
+  {id:'toQuiz',   label:'📝 開始測驗'},
+  {id:'toSnake',  label:'🛒 開始阿嬤買菜'}
+].forEach((b, i) => {
+  const r = { x: w/2 - rectW/2, y: yBtn + i * (btnH + gap) - btnH / 2, w: rectW, h: btnH };
   buttons[b.id] = r;
   drawButton(b.id, r, b.label);
 });
