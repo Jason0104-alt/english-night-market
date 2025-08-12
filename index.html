@@ -803,7 +803,8 @@ const hhRecent = Math.min(
 card(w * 0.50, yRecent, wwRecent, hhRecent, '最近 7 天', linesShown);
 
 // 下面按鈕的 Y（依卡片高度往下排）
-const y0 = yRecent + hhRecent + 60 * DPR;
+const maxRecentHeight = 300 * DPR; // 限制最近7天卡片高度
+const y0 = yRecent + Math.min(hhRecent, maxRecentHeight) + 60 * DPR;
 [
   {id:'backMenu', y:y0,              label:'← 返回 Menu'},
   {id:'toFlash',  y:y0 + 100 * DPR,  label:'🃏 開始閃卡'},
