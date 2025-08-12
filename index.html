@@ -210,7 +210,6 @@ if (localStorage.getItem('nm_music') === null) localStorage.setItem('nm_music','
 if (localStorage.getItem('nm_sfx') === null) localStorage.setItem('nm_sfx','1');  
 // 預設：音樂開、SFX 開。如果 localStorage 沒值，就給預設值。
 let musicOn = (localStorage.getItem('nm_music') ?? '1') === '1';
-if (localStorage.getItem('nm_sfx') === null) localStorage.setItem('nm_sfx','1');
 let sfxOn = localStorage.getItem('nm_sfx') === '1';
 
 // 音量調整（0.0 ~ 1.0）
@@ -576,7 +575,27 @@ function sfxTick(){  // 滴答：短促高頻
     // HUD
     const w=CANVAS.width;
     CTX.fillStyle=COL.white; CTX.textAlign='center'; CTX.font=`${18*DPR}px system-ui`;
-    CTX.fillText(`分數 Score: ${game.score}`, w/2, game.oy-16*DPR);
+    // HUD：把分數畫在棋盤內右上角，不擋標題
+{
+  const pad = 10*DPR;
+  const text = `Score ${game.score}`;
+  CTX.font = `${14*DPR}px system-ui`;
+  const m = CTX.measureText(text);
+  const bx = game.ox + game.cols*game.size - (m.width + pad*2) - 10*DPR;
+  const by = game.oy + 10*DPR;
+  const bw = m.width + pad*2;
+  const bh = 24*DPR;
+
+  CTX.fillStyle = 'rgba(0,0,0,0.35)';
+  roundedRect(bx, by, bw, bh, 12*DPR);
+  CTX.fill();
+  CTX.strokeStyle = '#ff5fa2';
+  CTX.lineWidth = 2*DPR;
+  CTX.stroke();
+  CTX.fillStyle = '#fff';
+  CTX.textAlign = 'center';
+  CTX.fillText(text, bx + bw/2, by + bh/2 + 4*DPR);
+}
 
     if (!game.started){
       CTX.fillStyle=COL.faint; CTX.font=`${16*DPR}px system-ui`; CTX.fillText('按方向鍵開始 · Use arrow keys to start', w/2, game.oy+game.rows*game.size+26*DPR);
