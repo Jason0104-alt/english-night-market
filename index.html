@@ -354,6 +354,8 @@ function sfxTick(){  // 滴答：短促高頻
     draw();
   }
   async function saveProfile(){
+    // 去重：避免 learnedWords 被重複加入
+    profile.learnedWords = Array.from(new Set((profile.learnedWords || []).map(s => String(s).trim())));
     profile.updatedAt = Date.now();
     localStorage.setItem(STORE_KEY, JSON.stringify(profile));
     if (fb.enabled && fb.user){
