@@ -745,6 +745,12 @@ function sfxTick(){  // 滴答：短促高頻
   });
   CANVAS.addEventListener('keydown',(e)=>{
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+    // 在 keydown 監聽裡、e.preventDefault() 後面加
+if (screen === SCREENS.QUIZ && ['1','2','3','4'].includes(e.key)) {
+  const idx = +e.key - 1;
+  if (quiz?.options?.[idx]) quizChoose(idx);
+  return;
+}
     if (screen===SCREENS.SNAKE && game){
       if (!game.started && ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) game.started=true;
       if (e.key==='ArrowUp'   && game.dir.y!==1)  game.nextDir={x:0,y:-1};
