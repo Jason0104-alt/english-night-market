@@ -197,24 +197,94 @@
   }
   modeSel.addEventListener('change', e=> setMode(e.target.value));
 
-  // ====== Audio ===============================================================
-  const A = {
-    bgm: document.getElementById('bgm'),
-    ok:  document.getElementById('sfxCorrect'),
-    bad: document.getElementById('sfxWrong'),
-    tick:document.getElementById('sfxTick')
-  };
-  let musicOn = (localStorage.getItem('nm_music') ?? '1') === '1';
-  let sfxOn = localStorage.getItem('nm_sfx')==='1';
-  function updateMusicUI(){ document.getElementById('musicBtn').textContent = musicOn ? '🔊 Music' : '🔈 Music'; }
-  function updateSfxUI(){ document.getElementById('sfxBtn').textContent = sfxOn ? '🔔 SFX' : '🔕 SFX'; }
-  function playSfx(which){ if (!sfxOn) return; const el = which==='ok'?A.ok:which==='bad'?A.bad:which==='tick'?A.tick:null; if (el){ try{ el.currentTime = 0; el.play(); }catch{} } }
-  document.getElementById('musicBtn').onclick = async ()=>{
-    musicOn=!musicOn; localStorage.setItem('nm_music', musicOn?'1':'0'); updateMusicUI();
-    if (musicOn) { try{ await A.bgm.play(); }catch{} } else { A.bgm.pause(); }
-  };
-  document.getElementById('sfxBtn').onclick = ()=>{ sfxOn=!sfxOn; localStorage.setItem('nm_sfx', sfxOn?'1':'0'); updateSfxUI(); };
-  updateMusicUI(); updateSfxUI();
+// ====== Audio ===============================================================
+const A = {
+  bgm:  document.getElementById('bgm'),
+  ok:   document.getElementById('sfxCorrect'),
+  bad:  document.getElementById('sfxWrong'),
+  tick: document.getElementById('sfxTick')
+};
+
+// 預設：音樂開、SFX 開。如果 localStorage 沒值，就給預設值。
+if (localStorage.getItem('nm_music') === null) localStorage.setItem('nm_music','1');
+if (localStorage.getItem('nm_sfx') === null) localStorage.setItem('nm_sfx','1');  
+// 預設：音樂開、SFX 開。如果 localStorage 沒值，就給預設值。
+let musicOn = (localStorage.getItem('nm_music') ?? '1') === '1';
+if (localStorage.getItem('nm_sfx') === null) localStorage.setItem('nm_sfx','1');
+let sfxOn = localStorage.getItem('nm_sfx') === '1';
+
+// 音量調整（0.0 ~ 1.0）
+A.bgm.volume  = 0.22;  // 背景音樂小聲
+A.ok.volume   = 0.9;   // 答對「叮」
+A.bad.volume  = 0.9;   // 答錯
+A.tick.volume = 0.7;   // 倒數滴答
+
+function updateMusicUI(){
+  document.getElementById('musicBtn').textContent = musicOn ? '🔊 Music' : '🔈 Music';
+}
+function updateSfxUI(){
+  document.getElementById('sfxBtn').textContent   = sfxOn   ? '🔔 SFX'   : '🔕 SFX';
+}
+
+function playSfx(which){
+  if (!sfxOn) return;
+  const el = which==='ok' ? A.ok
+           : which==='bad'? A.bad
+           : which==='tick'?A.tick : null;
+
+  // 先嘗試用 <audio> 播 mp3
+  if (el && el.readyState > 0 && !el.error){
+    try { el.currentTime = 0; el.play(); return; } catch {}
+  }
+  // mp3 不在或播失敗 → 用 WebAudio 後援
+  if (which==='ok')   sfxOK();
+  if (which==='bad')  sfxBad();
+  if (which==='tick') sfxTick();
+}
+
+document.getElementById('musicBtn').onclick = async ()=>{
+  musicOn = !musicOn;
+  localStorage.setItem('nm_music', musicOn ? '1':'0');
+  updateMusicUI();
+  if (musicOn){ try{ await A.bgm.play(); }catch{} } else { A.bgm.pause(); }
+};
+document.getElementById('sfxBtn').onclick = ()=>{
+  sfxOn = !sfxOn;
+  localStorage.setItem('nm_sfx', sfxOn ? '1':'0');
+  updateSfxUI();
+};
+
+updateMusicUI();
+updateSfxUI();
+// ---- WebAudio Fallback：當沒有 mp3 檔時，用合成音 ----
+let AC;
+function ensureAC(){ AC = AC || new (window.AudioContext || window.webkitAudioContext)(); }
+function beep(freq, dur, type='sine', gain=0.15){
+  ensureAC();
+  const t = AC.currentTime;
+  const o = AC.createOscillator();
+  const g = AC.createGain();
+  o.type = type;
+  o.frequency.value = freq;
+  g.gain.value = 0;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+  o.connect(g).connect(AC.destination);
+  o.start(t);
+  o.stop(t + dur);
+}
+function sfxOK(){    // 叮：兩段小音
+  beep(880, 0.09, 'sine', 0.18);
+  setTimeout(()=>beep(1320, 0.06, 'sine', 0.16), 70);
+}
+function sfxBad(){   // 錯：低頻兩下
+  beep(220, 0.11, 'square', 0.16);
+  setTimeout(()=>beep(170, 0.12, 'square', 0.16), 90);
+}
+function sfxTick(){  // 滴答：短促高頻
+  beep(1200, 0.045, 'triangle', 0.12);
+}  
   
   // ====== Firebase（可選） ====================================================
   const FIREBASE_CONFIG = {
