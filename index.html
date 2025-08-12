@@ -370,6 +370,23 @@ function sfxTick(){  // 滴答：短促高頻
   localStorage.setItem('dailyScores', JSON.stringify(dailyScores));
 }
 
+function formatMD(dateStr){
+  const d = new Date(dateStr);
+  const m = d.getMonth() + 1, day = d.getDate();
+  return `${m}/${day}`;
+}
+function getRecentScores(n = 7){
+  const out = [];
+  const today = new Date();
+  for (let i = n - 1; i >= 0; i--){
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const key = d.toISOString().slice(0,10); // YYYY-MM-DD
+    out.push({ date: key, score: dailyScores[key] });
+  }
+  return out;
+}
+
   // ====== Words / Topic / Level ==============================================
   // 只讀 ./words.json；若沒讀到，用較完整的預設資料（多 Topic、多等級），避免只剩 apple
   let TOPICS = {};
