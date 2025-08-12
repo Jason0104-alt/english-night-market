@@ -764,25 +764,53 @@ function getRecentScores(n = 7){
       `已學單字：${profile.learnedWords.length}`
     ]);
     
-    // 最近 7 天分數卡
-    const recent = getRecentScores(7);
-    const lines = recent.map(r => `${formatMD(r.date)}：${(r.score ?? '-') } 分`);
+    // ==== 最近 7 天分數卡（自動縮排，不擋到下面按鈕） ====
+const recentAll = getRecentScores(7);
+let linesAll = recentAll.map(r => `${formatMD(r.date)}：${(r.score ?? 0)} 分`);
 
-    // 位置與尺寸
-const yRecent  = startY + hh + 40*DPR;
-const wwRecent = Math.min(w*0.72, 740*DPR);
+const yRecent   = startY + hh + 40 * DPR;
+const wwRecent  = Math.min(w * 0.72, 740 * DPR);
 
-// 行距要跟 card() 的 20*DPR 一致
-const lineHeight = 20 * DPR;
-// 上下 padding
-const pad = 20 * DPR;
-// 最小高度（避免太矮）
-const minH = 130 * DPR;
+// 與 card() 內排版一致
+const titleH     = 30 * DPR;
+const lineHeight = 20 * DPR;   // 和 card 的 i*20*DPR 對齊
+const pad        = 20 * DPR;
 
-// 自動算高度（粗估：標題區 + 行數 * 行高 + padding）
-const hhRecent = Math.max(minH, pad * 2 + 30 * DPR + lines.length * lineHeight);
+// 底下按鈕區需求高度（3 個按鈕 + 兩個 100 的間距 + 底部留白）
+const rectW  = Math.min(w * 0.7, 740 * DPR);
+const rectH  = 60 * DPR;
+const btnBlockH = rectH * 3 + 100 * DPR * 2 + 80 * DPR;
 
-card(w*0.50, yRecent, wwRecent, hhRecent, '最近 7 天', lines);
+// 這張卡最多可用高度（不能把按鈕擠出畫面）
+const maxHRecent = Math.max(120 * DPR, CANVAS.height - (yRecent + 60 * DPR + btnBlockH));
+
+// 依可用高度，計算最多可顯示幾行
+const maxLines = Math.max(
+  1,
+  Math.floor((maxHRecent - (pad * 2 + titleH)) / lineHeight)
+);
+
+// 取最後面的幾天（越新的在下面）
+const linesShown = linesAll.slice(-maxLines);
+
+// 依實際行數回推卡片高度
+const hhRecent = pad * 2 + titleH + linesShown.length * lineHeight;
+
+// 畫卡片
+card(w * 0.50, yRecent, wwRecent, hhRecent, '最近 7 天', linesShown);
+
+// 下面按鈕的 Y（依卡片高度往下排）
+const y0 = yRecent + hhRecent + 60 * DPR;
+[
+  {id:'backMenu', y:y0,              label:'← 返回 Menu'},
+  {id:'toFlash',  y:y0 + 100 * DPR,  label:'🃏 開始閃卡'},
+  {id:'toQuiz',   y:y0 + 200 * DPR,  label:'📝 開始測驗'},
+  {id:'toSnake',  y:y0 + 300 * DPR,  label:'🛒 開始阿嬤買菜'}
+].forEach(b => {
+  const r = { x: w/2 - rectW/2, y: b.y - rectH/2, w: rectW, h: rectH };
+  buttons[b.id] = r;
+  drawButton(b.id, r, b.label);
+});
 
 // 調整下面按鈕的起始 Y
 const rectW = Math.min(w*0.7, 740*DPR), rectH = 60*DPR;
