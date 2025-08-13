@@ -237,14 +237,24 @@ function drawTitle(){
   const modeSel = document.getElementById('modeSel');
   modeSel.value = currentMode;
   document.getElementById('timerHint').textContent = MODES[currentMode].label;
-  function setMode(m){
-    currentMode = (m in MODES) ? m : 'normal';
-    localStorage.setItem('nm_mode', currentMode);
-    modeSel.value = currentMode;
-    document.getElementById('timerHint').textContent = MODES[currentMode].label;
-    if (game) game.tickMs = MODES[currentMode].snakeTick;
-    draw();
+function setMode(m){
+  currentMode = (m in MODES) ? m : 'normal';
+  localStorage.setItem('nm_mode', currentMode);
+  modeSel.value = currentMode;
+  document.getElementById('timerHint').textContent = MODES[currentMode].label;
+
+  if (game){
+    const sp = snakeSpeed(currentMode);
+    game.speedCfg = sp;
+    // 還沒開始或剛重置 → 用起始速度；進行中 → 只保底到新模式的最小 tick
+    if (!game.started || game.score === 0){
+      game.tickMs = sp.startTick;
+    } else {
+      game.tickMs = Math.max(sp.minTick, game.tickMs);
+    }
   }
+  draw();
+}
   modeSel.addEventListener('change', e=> setMode(e.target.value));
 
 // ====== Audio ===============================================================
@@ -254,7 +264,6 @@ const A = {
   bad:  document.getElementById('sfxWrong'),
   tick: document.getElementById('sfxTick')
 };
-
 // 預設：音樂開、SFX 開。如果 localStorage 沒值，就給預設值。
 if (localStorage.getItem('nm_music') === null) localStorage.setItem('nm_music','1');
 if (localStorage.getItem('nm_sfx') === null) localStorage.setItem('nm_sfx','1');  
@@ -676,128 +685,219 @@ function goalsFor(dateStr){
     }
     saveProfile(); setTimeout(()=>{ quiz.feedback=''; genQuiz(); draw(); }, 700);
   }
+// —— 阿嬤買菜：速度設定 ——
+// 依模式給：起始速度、最小速度、每顆的加速量（會隨分數遞增）
+function snakeSpeed(mode){
+  const base = MODES[mode].snakeTick;          // 既有基準（你原本的速度）
+  return {
+    baseTick:   base,                           // 參考值
+    startTick:  Math.round(base * 1.35),        // 起始更慢：比原來慢 35%
+    minTick:    Math.max(60, Math.round(base * 0.55)), // 最快下限（不可超過）
+    delta0:     1.8,                            // 前期每顆至少加速這麼多（毫秒）
+    deltaGrow:  0.35                            // 分數越高，每顆再多加這麼多
+  };
+}
+// ====== Snake（阿嬤買菜）===================================================
+let game=null;
 
-  // ====== Snake（阿嬤買菜）===================================================
-  let game=null;
-  function startGame(){
-    const size=Math.max(18*DPR, Math.floor(Math.min(CANVAS.width/34, CANVAS.height/30)));
-    const cols=Math.floor(CANVAS.width/size)-4;
-    const rows=Math.floor((CANVAS.height-topInset())/size)-7;
-    game={ size, cols, rows, ox:Math.floor((CANVAS.width-cols*size)/2), oy:Math.floor((CANVAS.height-rows*size)/2)+20*DPR,
-      dir:{x:1,y:0}, nextDir:{x:1,y:0}, snake:[], grocery:null, tickMs:MODES[currentMode].snakeTick,
-      lastTick:performance.now(), alive:true, score:0, wordOnPickup:null, started:false, paused:false, bannerT:0 };
-    const x0=Math.floor(cols/3), y0=Math.floor(rows/2);
-    game.snake=[{x:x0,y:y0},{x:x0-1,y:y0},{x:x0-2,y:y0}]; game.grocery=spawnGrocery(); incToday('games',0);
-  }
-  function drawSnake(){
-    drawBg(); drawTitle(); buttonsClear(); drawTopBar();
-    if (!game) startGame();
-    CTX.save(); CTX.translate(game.ox,game.oy);
-    CTX.fillStyle=COL.ink2; roundedRect(0,0,game.cols*game.size,game.rows*game.size,16*DPR); CTX.fill();
-    CTX.strokeStyle='rgba(255,255,255,0.06)'; CTX.lineWidth=1*DPR; CTX.beginPath();
-    for(let c=1;c<game.cols;c++){ const x=c*game.size; CTX.moveTo(x,0); CTX.lineTo(x,game.rows*game.size); }
-    for(let r=1;r<game.rows;r++){ const y=r*game.size; CTX.moveTo(0,y); CTX.lineTo(game.cols*game.size,y); }
-    CTX.stroke();
-    if (game.grocery) drawGrocery(game.grocery.x, game.grocery.y);
-    for(let i=game.snake.length-1;i>=0;i--){ const seg=game.snake[i]; if(i===0) drawGrandma(seg.x,seg.y,game.dir); else drawCart(seg.x,seg.y,i); }
-    CTX.restore();
+function startGame(){
+  const size=Math.max(18*DPR, Math.floor(Math.min(CANVAS.width/34, CANVAS.height/30)));
+  const cols=Math.floor(CANVAS.width/size)-4;
+  const rows=Math.floor((CANVAS.height-topInset())/size)-7;
 
-    // HUD
-    const w=CANVAS.width;
-    CTX.fillStyle=COL.white; CTX.textAlign='center'; CTX.font=`${18*DPR}px system-ui`;
-    // HUD：把分數畫在棋盤內右上角，不擋標題
-{
-  const pad = 10*DPR;
-  const text = `Score ${game.score}`;
-  CTX.font = `${14*DPR}px system-ui`;
-  const m = CTX.measureText(text);
-  const bx = game.ox + game.cols*game.size - (m.width + pad*2) - 10*DPR;
-  const by = game.oy + 10*DPR;
-  const bw = m.width + pad*2;
-  const bh = 24*DPR;
+  const sp = snakeSpeed(currentMode); // ← 取本局速度設定
 
-  CTX.fillStyle = 'rgba(0,0,0,0.35)';
-  roundedRect(bx, by, bw, bh, 12*DPR);
-  CTX.fill();
-  CTX.strokeStyle = '#ff5fa2';
-  CTX.lineWidth = 2*DPR;
-  CTX.stroke();
-  CTX.fillStyle = '#fff';
-  CTX.textAlign = 'center';
-  CTX.fillText(text, bx + bw/2, by + bh/2 + 4*DPR);
+  game={
+    size, cols, rows,
+    ox:Math.floor((CANVAS.width-cols*size)/2),
+    oy:Math.floor((CANVAS.height-rows*size)/2)+20*DPR,
+    dir:{x:1,y:0}, nextDir:{x:1,y:0},
+    snake:[],
+    grocery:null,
+    tickMs: sp.startTick,                 // ← 起始比以前慢（更友善）
+    lastTick:performance.now(),
+    alive:true, score:0,
+    wordOnPickup:null, started:false, paused:false, bannerT:0,
+    speedCfg: sp                          // ← 存起來給後面用
+  };
+
+  const x0=Math.floor(cols/3), y0=Math.floor(rows/2);
+  game.snake=[{x:x0,y:y0},{x:x0-1,y:y0},{x:x0-2,y:y0}];
+  game.grocery=spawnGrocery();
+  incToday('games',0);
 }
 
-    if (!game.started){
-      CTX.fillStyle=COL.faint; CTX.font=`${16*DPR}px system-ui`; CTX.fillText('按方向鍵開始 · Use arrow keys to start', w/2, game.oy+game.rows*game.size+26*DPR);
-    } else if (game.paused){
-      CTX.fillStyle=COL.faint; CTX.font=`${16*DPR}px system-ui`; CTX.fillText('暫停中 · Press P to resume', w/2, game.oy+game.rows*game.size+26*DPR);
-    } else {
-      CTX.fillStyle=COL.dim; CTX.font=`${12*DPR}px system-ui`; CTX.fillText('P 暫停 / R 重來 / M Menu', w/2, game.oy+game.rows*game.size+24*DPR);
+function drawSnake(){
+  drawBg(); drawTitle(); buttonsClear(); drawTopBar();
+  if (!game) startGame();
+
+  CTX.save(); CTX.translate(game.ox,game.oy);
+  CTX.fillStyle=COL.ink2; roundedRect(0,0,game.cols*game.size,game.rows*game.size,16*DPR); CTX.fill();
+  CTX.strokeStyle='rgba(255,255,255,0.06)'; CTX.lineWidth=1*DPR; CTX.beginPath();
+  for(let c=1;c<game.cols;c++){ const x=c*game.size; CTX.moveTo(x,0); CTX.lineTo(x,game.rows*game.size); }
+  for(let r=1;r<game.rows;r++){ const y=r*game.size; CTX.moveTo(0,y); CTX.lineTo(game.cols*game.size,y); }
+  CTX.stroke();
+
+  if (game.grocery) drawGrocery(game.grocery.x, game.grocery.y);
+  for(let i=game.snake.length-1;i>=0;i--){
+    const seg=game.snake[i];
+    if(i===0) drawGrandma(seg.x,seg.y,game.dir);
+    else drawCart(seg.x,seg.y,i);
+  }
+  CTX.restore();
+
+  // HUD
+  const w=CANVAS.width;
+  CTX.fillStyle=COL.white; CTX.textAlign='center'; CTX.font=`${18*DPR}px system-ui`;
+
+  // HUD：把分數畫在棋盤內右上角，不擋標題
+  {
+    const pad = 10*DPR;
+    const text = `Score ${game.score}`;
+    CTX.font = `${14*DPR}px system-ui`;
+    const m = CTX.measureText(text);
+    const bx = game.ox + game.cols*game.size - (m.width + pad*2) - 10*DPR;
+    const by = game.oy + 10*DPR;
+    const bw = m.width + pad*2;
+    const bh = 24*DPR;
+
+    CTX.fillStyle = 'rgba(0,0,0,0.35)';
+    roundedRect(bx, by, bw, bh, 12*DPR);
+    CTX.fill();
+    CTX.strokeStyle = '#ff5fa2';
+    CTX.lineWidth = 2*DPR;
+    CTX.stroke();
+    CTX.fillStyle = '#fff';
+    CTX.textAlign = 'center';
+    CTX.fillText(text, bx + bw/2, by + bh/2 + 4*DPR);
+  }
+
+  if (!game.started){
+    CTX.fillStyle=COL.faint; CTX.font=`${16*DPR}px system-ui`;
+    CTX.fillText('按方向鍵開始 · Use arrow keys to start', w/2, game.oy+game.rows*game.size+26*DPR);
+  } else if (game.paused){
+    CTX.fillStyle=COL.faint; CTX.font=`${16*DPR}px system-ui`;
+    CTX.fillText('暫停中 · Press P to resume', w/2, game.oy+game.rows*game.size+26*DPR);
+  } else {
+    CTX.fillStyle=COL.dim; CTX.font=`${12*DPR}px system-ui`;
+    CTX.fillText('P 暫停 / R 重來 / M Menu', w/2, game.oy+game.rows*game.size+24*DPR);
+  }
+}
+
+function drawGrandma(gx,gy,dir){
+  const s=game.size, x=gx*s, y=gy*s; CTX.save(); CTX.translate(x,y);
+  CTX.fillStyle='#7c8ba1'; roundedRect(2,2,s-4,s-4,8*DPR); CTX.fill();
+  CTX.save(); CTX.translate(s/2,s/2);
+  CTX.fillStyle='#ffd9c2'; CTX.beginPath(); CTX.arc(0,0,s*0.28,0,Math.PI*2); CTX.fill();
+  CTX.fillStyle='#a7b0bd'; CTX.beginPath(); CTX.arc(0,-s*0.22,s*0.10,0,Math.PI*2); CTX.fill();
+  CTX.beginPath(); CTX.arc(0,0,s*0.30,Math.PI*0.7,Math.PI*0.3,true); CTX.strokeStyle='#9aa6b2'; CTX.lineWidth=4*DPR; CTX.stroke();
+  CTX.fillStyle='#3a3a3a'; const ex=s*0.10, ey=-s*0.02; CTX.beginPath(); CTX.arc(-ex,ey,2.5*DPR,0,Math.PI*2); CTX.fill(); CTX.beginPath(); CTX.arc(ex,ey,2.5*DPR,0,Math.PI*2); CTX.fill();
+  CTX.strokeStyle='#c05b6e'; CTX.lineWidth=2.2*DPR; CTX.beginPath(); CTX.arc(0,s*0.06,s*0.10,0,Math.PI); CTX.stroke();
+  CTX.restore();
+  CTX.strokeStyle='rgba(255,255,255,0.6)'; CTX.lineWidth=2*DPR; CTX.beginPath();
+  const cx=s/2, cy=s*0.82;
+  if (dir.x===1){ CTX.moveTo(cx-7,cy); CTX.lineTo(cx+7,cy); CTX.lineTo(cx+1,cy-6); }
+  if (dir.x===-1){ CTX.moveTo(cx+7,cy); CTX.lineTo(cx-7,cy); CTX.lineTo(cx-1,cy-6); }
+  if (dir.y===1){ CTX.moveTo(cx,cy-10); CTX.lineTo(cx,cy+8); CTX.lineTo(cx-6,cy+2); }
+  if (dir.y===-1){ CTX.moveTo(cx,cy+8); CTX.lineTo(cx,cy-10); CTX.lineTo(cx-6,cy-4); }
+  CTX.stroke(); CTX.restore();
+}
+
+function drawCart(gx,gy,i){
+  const s=game.size, x=gx*s, y=gy*s; CTX.save(); CTX.translate(x,y);
+  CTX.fillStyle=i%2?'#567':'#495871'; roundedRect(4,4,s-8,s-8,6*DPR); CTX.fill();
+  CTX.fillStyle='#222'; CTX.beginPath(); CTX.arc(8,s-6,3*DPR,0,2*Math.PI); CTX.fill(); CTX.beginPath(); CTX.arc(s-8,s-6,3*DPR,0,2*Math.PI); CTX.fill();
+  CTX.restore();
+}
+
+function drawGrocery(gx,gy){
+  const s=game.size, x=gx*s, y=gy*s; CTX.save(); CTX.translate(x,y);
+  CTX.fillStyle='#d7a96b'; roundedRect(4,6,s-8,s-10,6*DPR); CTX.fill(); CTX.strokeStyle='rgba(0,0,0,0.2)'; CTX.stroke();
+  CTX.fillStyle='#5fd16b'; CTX.beginPath(); CTX.arc(s*0.35,8,4*DPR,0,2*Math.PI); CTX.fill();
+  CTX.fillStyle='#ff6b6b'; CTX.beginPath(); CTX.arc(s*0.6,9,4*DPR,0,2*Math.PI); CTX.fill();
+  CTX.restore();
+}
+
+function spawnGrocery(){
+  let x,y,ok=false; while(!ok){ x=(Math.random()*game.cols)|0; y=(Math.random()*game.rows)|0; ok=!game.snake.some(s=>s.x===x&&s.y===y); }
+  return {x,y};
+}
+
+function showPickupBanner(word){
+  const el = document.getElementById('pickup');
+  el.querySelector('.en').textContent = word.en;
+  el.querySelector('.zh').textContent = word.zh;
+  el.style.opacity = '1';
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>{ el.style.opacity='0'; setTimeout(()=>{ el.classList.remove('show'); }, 200); }, 1100);
+}
+
+function stepGame(now){
+  if (!game || !game.alive || game.paused) return;
+
+  const dt=now - game.lastTick;
+  if (dt < game.tickMs) return;
+
+  game.lastTick=now;
+  game.dir=game.nextDir;
+
+  const head={...game.snake[0]};
+  head.x+=game.dir.x; head.y+=game.dir.y;
+
+  if (head.x<0||head.y<0||head.x>=game.cols||head.y>=game.rows) return gameOver();
+  if (game.snake.some(s=>s.x===head.x&&s.y===head.y)) return gameOver();
+
+  game.snake.unshift(head);
+
+  if (head.x===game.grocery.x && head.y===game.grocery.y){
+    // —— 吃到 —— //
+    game.score++;
+    profile.highScore=Math.max(profile.highScore||0, game.score);
+
+    if (game.score===1) incToday('games',1);
+    grantXP(5);
+
+    const word=nextWord();
+    showPickupBanner(word);
+    if (!profile.learnedWords.includes(word.en)){
+      profile.learnedWords.push(word.en);
+      incToday('words',1);
     }
+    saveProfile();
+    speakWord(word.en);
+
+    game.grocery=spawnGrocery();
+
+    // —— 速度：分數越高，每顆加速越多，並且有最小下限 —— //
+    const sp = game.speedCfg || snakeSpeed(currentMode);
+    const speedUp = sp.delta0 + sp.deltaGrow * Math.min(game.score, 30); // 封頂避免暴衝
+    game.tickMs = Math.max(sp.minTick, game.tickMs - speedUp);
+
+  }else{
+    game.snake.pop();
   }
-  function drawGrandma(gx,gy,dir){
-    const s=game.size, x=gx*s, y=gy*s; CTX.save(); CTX.translate(x,y);
-    CTX.fillStyle='#7c8ba1'; roundedRect(2,2,s-4,s-4,8*DPR); CTX.fill();
-    CTX.save(); CTX.translate(s/2,s/2);
-    CTX.fillStyle='#ffd9c2'; CTX.beginPath(); CTX.arc(0,0,s*0.28,0,Math.PI*2); CTX.fill();
-    CTX.fillStyle='#a7b0bd'; CTX.beginPath(); CTX.arc(0,-s*0.22,s*0.10,0,Math.PI*2); CTX.fill();
-    CTX.beginPath(); CTX.arc(0,0,s*0.30,Math.PI*0.7,Math.PI*0.3,true); CTX.strokeStyle='#9aa6b2'; CTX.lineWidth=4*DPR; CTX.stroke();
-    CTX.fillStyle='#3a3a3a'; const ex=s*0.10, ey=-s*0.02; CTX.beginPath(); CTX.arc(-ex,ey,2.5*DPR,0,Math.PI*2); CTX.fill(); CTX.beginPath(); CTX.arc(ex,ey,2.5*DPR,0,Math.PI*2); CTX.fill();
-    CTX.strokeStyle='#c05b6e'; CTX.lineWidth=2.2*DPR; CTX.beginPath(); CTX.arc(0,s*0.06,s*0.10,0,Math.PI); CTX.stroke();
-    CTX.restore();
-    CTX.strokeStyle='rgba(255,255,255,0.6)'; CTX.lineWidth=2*DPR; CTX.beginPath();
-    const cx=s/2, cy=s*0.82;
-    if (dir.x===1){ CTX.moveTo(cx-7,cy); CTX.lineTo(cx+7,cy); CTX.lineTo(cx+1,cy-6); }
-    if (dir.x===-1){ CTX.moveTo(cx+7,cy); CTX.lineTo(cx-7,cy); CTX.lineTo(cx-1,cy-6); }
-    if (dir.y===1){ CTX.moveTo(cx,cy-10); CTX.lineTo(cx,cy+8); CTX.lineTo(cx-6,cy+2); }
-    if (dir.y===-1){ CTX.moveTo(cx,cy+8); CTX.lineTo(cx,cy-10); CTX.lineTo(cx-6,cy-4); }
-    CTX.stroke(); CTX.restore();
-  }
-  function drawCart(gx,gy,i){ const s=game.size, x=gx*s, y=gy*s; CTX.save(); CTX.translate(x,y);
-    CTX.fillStyle=i%2?'#567':'#495871'; roundedRect(4,4,s-8,s-8,6*DPR); CTX.fill();
-    CTX.fillStyle='#222'; CTX.beginPath(); CTX.arc(8,s-6,3*DPR,0,2*Math.PI); CTX.fill(); CTX.beginPath(); CTX.arc(s-8,s-6,3*DPR,0,2*Math.PI); CTX.fill(); CTX.restore(); }
-  function drawGrocery(gx,gy){ const s=game.size, x=gx*s, y=gy*s; CTX.save(); CTX.translate(x,y);
-    CTX.fillStyle='#d7a96b'; roundedRect(4,6,s-8,s-10,6*DPR); CTX.fill(); CTX.strokeStyle='rgba(0,0,0,0.2)'; CTX.stroke();
-    CTX.fillStyle='#5fd16b'; CTX.beginPath(); CTX.arc(s*0.35,8,4*DPR,0,2*Math.PI); CTX.fill();
-    CTX.fillStyle='#ff6b6b'; CTX.beginPath(); CTX.arc(s*0.6,9,4*DPR,0,2*Math.PI); CTX.fill(); CTX.restore(); }
-  function spawnGrocery(){ let x,y,ok=false; while(!ok){ x=(Math.random()*game.cols)|0; y=(Math.random()*game.rows)|0; ok=!game.snake.some(s=>s.x===x&&s.y===y); } return {x,y}; }
-  function showPickupBanner(word){
-    const el = document.getElementById('pickup');
-    el.querySelector('.en').textContent = word.en;
-    el.querySelector('.zh').textContent = word.zh;
-    el.style.opacity = '1';
-    el.classList.add('show');
-    clearTimeout(el._t);
-    el._t = setTimeout(()=>{ el.style.opacity='0'; setTimeout(()=>{ el.classList.remove('show'); }, 200); }, 1100);
-  }
-  function stepGame(now){
-    if (!game || !game.alive || game.paused) return;
-    const dt=now - game.lastTick; if (dt < game.tickMs) return; game.lastTick=now; game.dir=game.nextDir;
-    const head={...game.snake[0]}; head.x+=game.dir.x; head.y+=game.dir.y;
-    if (head.x<0||head.y<0||head.x>=game.cols||head.y>=game.rows) return gameOver();
-    if (game.snake.some(s=>s.x===head.x&&s.y===head.y)) return gameOver();
-    game.snake.unshift(head);
-    if (head.x===game.grocery.x && head.y===game.grocery.y){
-      game.score++; profile.highScore=Math.max(profile.highScore||0, game.score);
-      if (game.score===1) incToday('games',1); grantXP(5);
-      const word=nextWord(); showPickupBanner(word);
-      if (!profile.learnedWords.includes(word.en)){ profile.learnedWords.push(word.en); incToday('words',1); }
-      saveProfile(); speakWord(word.en); game.grocery=spawnGrocery(); game.tickMs=Math.max(70, game.tickMs-1.4);
-    }else{ game.snake.pop(); }
-  }
-  function gameOver(){ 
+}
+
+function gameOver(){
   // ➊ 記錄今天最高分
   const d = TODAY();
   const best = Math.max(dailyScores[d] || 0, game.score);
   dailyScores[d] = best;
   saveDailyScores();
 
-  game.alive=false; grantXP(3); saveProfile();
-    const w=CANVAS.width, h=CANVAS.height; CTX.fillStyle='rgba(0,0,0,0.5)'; CTX.fillRect(0,0,w,h);
-    CTX.fillStyle=COL.white; CTX.textAlign='center'; CTX.font=`${28*DPR}px system-ui`; CTX.fillText('遊戲結束 · Game Over', w/2, h/2-30*DPR);
-    CTX.font=`${18*DPR}px system-ui`; CTX.fillText(`分數 Score: ${game.score}   最高 High: ${profile.highScore}`, w/2, h/2+6*DPR);
-    CTX.fillText('按 R 重新開始 · Press R to restart', w/2, h/2+36*DPR);
-  }
+  game.alive=false;
+  grantXP(3);
+  saveProfile();
+
+  const w=CANVAS.width, h=CANVAS.height;
+  CTX.fillStyle='rgba(0,0,0,0.5)'; CTX.fillRect(0,0,w,h);
+  CTX.fillStyle=COL.white; CTX.textAlign='center'; CTX.font=`${28*DPR}px system-ui`;
+  CTX.fillText('遊戲結束 · Game Over', w/2, h/2-30*DPR);
+  CTX.font=`${18*DPR}px system-ui`;
+  CTX.fillText(`分數 Score: ${game.score}   最高 High: ${profile.highScore}`, w/2, h/2+6*DPR);
+  CTX.fillText('按 R 重新開始 · Press R to restart', w/2, h/2+36*DPR);
+}
 
   // ====== UI: 菜單 / 儀表板 ===================================================
   const SCREENS = { MENU:'menu', DASH:'dash', FLASH:'flash', QUIZ:'quiz', SNAKE:'snake' };
