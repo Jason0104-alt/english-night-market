@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <title>英語夜市｜English Night Market</title>
+<meta name="color-scheme" content="dark">
 <style>
   :root{
     --bg1:#0b0f1a; --bg2:#1a2236; --ink:#101422; --card:#11203a; --line:rgba(255,255,255,.15);
@@ -41,7 +42,7 @@
     display:none; z-index:9999;
   }
 
-  /* On-pickup banner (超明顯的字) */
+  /* On-pickup banner */
   #pickup{
     position:fixed; left:50%; top:50%; transform:translate(-50%,-50%) scale(.98);
     background:rgba(0,0,0,.72);
@@ -59,12 +60,12 @@
 <body>
 
 <!-- Controls -->
-<div id="topControls">
-  <div class="pill">
-    <button id="musicBtn">🔈 Music</button>
-    <button id="sfxBtn">🔕 SFX</button>
+<div id="topControls" role="toolbar" aria-label="遊戲控制列">
+  <div class="pill" aria-label="音效控制">
+    <button id="musicBtn" type="button" aria-pressed="true">🔊 Music</button>
+    <button id="sfxBtn"   type="button" aria-pressed="true">🔔 SFX</button>
   </div>
-  <div class="pill">
+  <div class="pill" aria-label="模式">
     <label>Mode&nbsp;
       <select id="modeSel" title="影響計時與遊戲速度，不影響抽字">
         <option value="easy">Easy</option>
@@ -74,12 +75,12 @@
     </label>
     <span id="timerHint" style="opacity:.85"></span>
   </div>
-  <div class="pill">
+  <div class="pill" aria-label="主題">
     <label>Topic&nbsp;
-      <select id="topicSel"><option value="">Loading…</option></select>
+      <select id="topicSel" aria-live="polite"><option value="">Loading…</option></select>
     </label>
   </div>
-  <div class="pill">
+  <div class="pill" aria-label="等級">
     <label>Level&nbsp;
       <select id="levelSel" title="依 words.json 的 level 欄位篩選">
         <option value="all" selected>All</option>
@@ -89,15 +90,15 @@
       </select>
     </label>
   </div>
-  <div class="pill" id="authPill">
+  <div class="pill" id="authPill" aria-label="登入狀態">
     <span id="authStatus">離線模式</span>
-    <button id="loginBtn">登入</button>
-    <button id="logoutBtn" style="display:none">登出</button>
+    <button id="loginBtn"  type="button">登入</button>
+    <button id="logoutBtn" type="button" style="display:none">登出</button>
   </div>
 </div>
 
-<div id="toast"></div>
-<div id="pickup"><div class="en"></div><div class="zh"></div><div class="hint">＋5 XP · 已唸出發音</div></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="pickup" aria-hidden="true"><div class="en"></div><div class="zh"></div><div class="hint">＋5 XP · 已唸出發音</div></div>
 
 <!-- Audio -->
 <audio id="bgm" src="./sb_adriftamonginfinitestars(chosic.com).mp3" loop preload="auto" muted></audio>
@@ -106,16 +107,18 @@
 <audio id="sfxTick"    src="./audio/tick.mp3"    preload="auto" crossorigin="anonymous"></audio>
 
 <script>
+  // 解鎖音訊播放（一次互動後）
   function unmuteAndPlayOnce() {
     const bgm = document.getElementById('bgm');
     bgm.muted = false;
     bgm.play().catch(()=>{});
     window.removeEventListener('pointerdown', unmuteAndPlayOnce);
-    window.removeEventListener('keydown', unmuteAndPlayOnce);
+    window.removeEventListener('keydown',    unmuteAndPlayOnce);
   }
   window.addEventListener('pointerdown', unmuteAndPlayOnce, { once:true });
-  window.addEventListener('keydown',  unmuteAndPlayOnce, { once:true });
+  window.addEventListener('keydown',     unmuteAndPlayOnce, { once:true });
 </script>
+
 <canvas id="app" tabindex="0" aria-label="English Night Market"></canvas>
 
 <!-- Firebase（可選；不填就維持離線） -->
@@ -133,20 +136,34 @@
   const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
   const lerp = (a,b,t)=>a+(b-a)*t;
 
-  function resize(){
-    CANVAS.width = Math.floor(window.innerWidth * DPR);
+  // rAF 節流的 resize
+  let resizeQueued = false;
+  function doResize(){
+    CANVAS.width  = Math.floor(window.innerWidth  * DPR);
     CANVAS.height = Math.floor(window.innerHeight * DPR);
-    CANVAS.style.width = window.innerWidth + 'px';
+    CANVAS.style.width  = window.innerWidth  + 'px';
     CANVAS.style.height = window.innerHeight + 'px';
     draw();
+    resizeQueued = false;
   }
-  window.addEventListener('resize', resize);
-  function topInset(){ const el = document.getElementById('topControls'); return ((el?.offsetHeight || 0) + 24) * DPR; }
+  function requestResize(){
+    if (resizeQueued) return;
+    resizeQueued = true;
+    requestAnimationFrame(doResize);
+  }
+  window.addEventListener('resize', requestResize, { passive:true });
+
+  function topInset(){
+    const el = document.getElementById('topControls');
+    return ((el?.offsetHeight || 0) + 24) * DPR;
+  }
 
   const toastEl = document.getElementById('toast');
   function toast(msg, ms=2800){
-    toastEl.textContent = msg; toastEl.style.display='block';
-    clearTimeout(toastEl._t); toastEl._t = setTimeout(()=> toastEl.style.display='none', ms);
+    toastEl.textContent = msg;
+    toastEl.style.display='block';
+    clearTimeout(toastEl._t);
+    toastEl._t = setTimeout(()=> toastEl.style.display='none', ms);
   }
 
   // ====== Theme ===============================================================
@@ -155,77 +172,85 @@
     gold:'#ffcf59', ink:'#101422', ink2:'#172036', card:'#11203a',
     line:'rgba(255,255,255,0.15)', white:'#ffffff', faint:'rgba(255,255,255,0.7)', dim:'rgba(255,255,255,0.38)'
   };
-  function roundedRect(x,y,w,h,r){ CTX.beginPath(); CTX.moveTo(x+r,y); CTX.arcTo(x+w,y,x+w,y+h,r); CTX.arcTo(x+w,y+h,x,y+h,r); CTX.arcTo(x,y+h,x,y,r); CTX.arcTo(x,y,x+w,y,r); CTX.closePath(); }
-  function drawLantern(x,y,alt=0){ CTX.save(); CTX.translate(x,y); CTX.fillStyle = alt?COL.gold:'#ff934d'; roundedRect(-16*DPR,-12*DPR,32*DPR,24*DPR,8*DPR); CTX.fill(); CTX.strokeStyle='rgba(255,255,255,0.15)'; CTX.stroke(); CTX.fillStyle='#ff3b30'; CTX.fillRect(-4*DPR,12*DPR,8*DPR,6*DPR); CTX.restore(); }
+  function roundedRect(x,y,w,h,r){
+    CTX.beginPath();
+    CTX.moveTo(x+r,y);
+    CTX.arcTo(x+w,y,x+w,y+h,r);
+    CTX.arcTo(x+w,y+h,x,y+h,r);
+    CTX.arcTo(x,y+h,x,y,r);
+    CTX.arcTo(x,y,x+w,y,r);
+    CTX.closePath();
+  }
+  function drawLantern(x,y,alt=0){
+    CTX.save(); CTX.translate(x,y);
+    CTX.fillStyle = alt?COL.gold:'#ff934d';
+    roundedRect(-16*DPR,-12*DPR,32*DPR,24*DPR,8*DPR);
+    CTX.fill();
+    CTX.strokeStyle='rgba(255,255,255,0.15)'; CTX.stroke();
+    CTX.fillStyle='#ff3b30'; CTX.fillRect(-4*DPR,12*DPR,8*DPR,6*DPR);
+    CTX.restore();
+  }
   function drawBg(){
     const {width:w,height:h} = CANVAS;
-    const g = CTX.createLinearGradient(0,0,0,h); g.addColorStop(0,COL.bgTop); g.addColorStop(1,COL.bgBot);
+    const g = CTX.createLinearGradient(0,0,0,h);
+    g.addColorStop(0,COL.bgTop); g.addColorStop(1,COL.bgBot);
     CTX.fillStyle=g; CTX.fillRect(0,0,w,h);
     const rows=3, cols=9;
     for (let r=0;r<rows;r++){
       const y=(h*0.14)+r*(h*0.14);
       CTX.strokeStyle=COL.line; CTX.lineWidth=2*DPR;
-      CTX.beginPath(); CTX.moveTo(w*0.05,y); CTX.quadraticCurveTo(w*0.5,y+(r%2?18:-18)*DPR,w*0.95,y); CTX.stroke();
-      for (let c=0;c<cols;c++){ const t=c/(cols-1); const x=lerp(w*0.05,w*0.95,t); drawLantern(x,y+(r%2?10:-10)*DPR,(r%2?1:0)); }
+      CTX.beginPath(); CTX.moveTo(w*0.05,y);
+      CTX.quadraticCurveTo(w*0.5,y+(r%2?18:-18)*DPR,w*0.95,y);
+      CTX.stroke();
+      for (let c=0;c<cols;c++){
+        const t=c/(cols-1); const x=lerp(w*0.05,w*0.95,t);
+        drawLantern(x,y+(r%2?10:-10)*DPR,(r%2?1:0));
+      }
     }
   }
-function drawTitle(){
-  CTX.save();
-  const x = CANVAS.width / 2;
-  const y1 = topInset() + 40 * DPR; // 主標
-  const y2 = topInset() + 70 * DPR; // 副標
+  function drawTitle(){
+    CTX.save();
+    const x = CANVAS.width / 2;
+    const y1 = topInset() + 40 * DPR;
+    const y2 = topInset() + 70 * DPR;
 
-  CTX.textAlign = 'center';
+    CTX.textAlign = 'center';
+    CTX.font = `${36*DPR}px ui-sans-serif, system-ui, Segoe UI, Roboto, sans-serif`;
+    const text1 = '英語夜市 · English Night Market';
+    const text2 = '學英文 · 玩遊戲 · 每日進步';
+    const paddingX = 20 * DPR;
+    const textWidth = CTX.measureText(text1).width;
+    const rectX = x - textWidth / 2 - paddingX;
+    const rectY = y1 - 36 * DPR;
+    const rectHeight = 50 * DPR;
 
-  // 主標：加陰影、稍微放大
-  CTX.font = `${36*DPR}px ui-sans-serif, system-ui, Segoe UI, Roboto, sans-serif`;
-  CTX.fillStyle = COL.white;
-  //CTX.shadowColor = 'rgba(0,0,0,0.55)';
-  //CTX.shadowBlur = 10 * DPR;
-  //CTX.shadowOffsetY = 2 * DPR;
-  
-  const paddingX = 20 * DPR;
-  const paddingY = 10 * DPR;
-  const textWidth = CTX.measureText('英語夜市 · English Night Market').width;
-  const rectX = x - textWidth / 2 - paddingX;
-  const rectY = y1 - 36 * DPR; // 上方留白
-  const rectHeight = 50 * DPR;
+    CTX.save();
+    CTX.shadowColor = 'transparent';
+    CTX.fillStyle = 'rgba(0, 0, 0, 0.40)';
+    CTX.fillRect(rectX, rectY, textWidth + paddingX * 2, rectHeight);
+    CTX.restore();
 
-  CTX.save();                         // 關掉陰影，只給背景矩形用
-  CTX.shadowColor = 'transparent';
-  CTX.fillStyle = 'rgba(0, 0, 0, 0.4)';
-  CTX.fillRect(rectX, rectY, textWidth + paddingX * 2, rectHeight);
-  CTX.restore();                      // 還原，讓後面的文字保留陰影
-  CTX.fillStyle = COL.white; // 重設回白色
-  // 先畫一層假陰影（半透明黑字往下 2px）
-  CTX.save();
-  CTX.fillStyle = 'rgba(0,0,0,0.38)';
-  CTX.fillText('英語夜市 · English Night Market', x, y1 + 2 * DPR);
-  CTX.restore();
+    // outline
+    CTX.save();
+    CTX.lineWidth   = 5 * DPR;
+    CTX.strokeStyle = 'rgba(0,0,0,0.85)';
+    CTX.lineJoin   = 'round';
+    CTX.miterLimit = 2;
+    CTX.strokeText(text1, x, y1);
+    CTX.restore();
 
-  // 再畫外框（不要陰影）
-  CTX.save();
-  CTX.lineWidth   = 5 * DPR;
-  CTX.strokeStyle = 'rgba(0,0,0,0.85)';
-  CTX.lineJoin   = 'round';
-  CTX.lineCap    = 'round';
-  CTX.miterLimit = 2;
-  CTX.strokeText('英語夜市 · English Night Market', x, y1);
-  CTX.restore();
+    CTX.fillStyle = COL.white;
+    CTX.fillText(text1, x, y1);
 
-  // 最後畫白字（本體）
-  CTX.fillStyle = COL.white;
-  CTX.fillText('英語夜市 · English Night Market', x, y1);
-  
-  // 副標：保留較淡的顏色，也加一點陰影
-  CTX.font = `${17*DPR}px system-ui`;
-  CTX.fillStyle = COL.faint;
-  CTX.shadowBlur = 6 * DPR;
-  CTX.shadowOffsetY = 1 * DPR;
-  CTX.fillText('學英文 · 玩遊戲 · 每日進步', x, y2);
-  CTX.shadowColor = 'transparent';
-  CTX.restore();
-}
+    // sub
+    CTX.font = `${17*DPR}px system-ui`;
+    CTX.fillStyle = COL.faint;
+    CTX.shadowBlur = 6 * DPR;
+    CTX.shadowOffsetY = 1 * DPR;
+    CTX.fillText(text2, x, y2);
+    CTX.shadowColor = 'transparent';
+    CTX.restore();
+  }
 
   // ====== Modes ===============================================================
   const MODES = {
@@ -237,127 +262,109 @@ function drawTitle(){
   const modeSel = document.getElementById('modeSel');
   modeSel.value = currentMode;
   document.getElementById('timerHint').textContent = MODES[currentMode].label;
-function setMode(m){
-  currentMode = (m in MODES) ? m : 'normal';
-  localStorage.setItem('nm_mode', currentMode);
-  modeSel.value = currentMode;
-  document.getElementById('timerHint').textContent = MODES[currentMode].label;
 
-  if (game){
-    const sp = snakeSpeed(currentMode);
-    game.speedCfg = sp;
-    // 還沒開始或剛重置 → 用起始速度；進行中 → 只保底到新模式的最小 tick
-    if (!game.started || game.score === 0){
-      game.tickMs = sp.startTick;
-    } else {
-      game.tickMs = Math.max(sp.minTick, game.tickMs);
+  function setMode(m){
+    currentMode = (m in MODES) ? m : 'normal';
+    localStorage.setItem('nm_mode', currentMode);
+    modeSel.value = currentMode;
+    document.getElementById('timerHint').textContent = MODES[currentMode].label;
+
+    if (game){
+      const sp = snakeSpeed(currentMode);
+      game.speedCfg = sp;
+      if (!game.started || game.score === 0){
+        game.tickMs = sp.startTick;
+      } else {
+        game.tickMs = Math.max(sp.minTick, game.tickMs);
+      }
     }
+    draw();
   }
-  draw();
-}
   modeSel.addEventListener('change', e=> setMode(e.target.value));
 
-// ====== Audio ===============================================================
-const A = {
-  bgm:  document.getElementById('bgm'),
-  ok:   document.getElementById('sfxCorrect'),
-  bad:  document.getElementById('sfxWrong'),
-  tick: document.getElementById('sfxTick')
-};
-// 預設：音樂開、SFX 開。如果 localStorage 沒值，就給預設值。
-if (localStorage.getItem('nm_music') === null) localStorage.setItem('nm_music','1');
-if (localStorage.getItem('nm_sfx') === null) localStorage.setItem('nm_sfx','1');  
-// 預設：音樂開、SFX 開。如果 localStorage 沒值，就給預設值。
-let musicOn = (localStorage.getItem('nm_music') ?? '1') === '1';
-let sfxOn = localStorage.getItem('nm_sfx') === '1';
+  // ====== Audio ===============================================================
+  const A = {
+    bgm:  document.getElementById('bgm'),
+    ok:   document.getElementById('sfxCorrect'),
+    bad:  document.getElementById('sfxWrong'),
+    tick: document.getElementById('sfxTick')
+  };
+  if (localStorage.getItem('nm_music') === null) localStorage.setItem('nm_music','1');
+  if (localStorage.getItem('nm_sfx')   === null) localStorage.setItem('nm_sfx','1');
+  let musicOn = (localStorage.getItem('nm_music') ?? '1') === '1';
+  let sfxOn   = (localStorage.getItem('nm_sfx')   ?? '1') === '1';
 
-// 音量調整（0.0 ~ 1.0）
-A.bgm.volume  = 0.22;  // 背景音樂小聲
-A.ok.volume   = 0.9;   // 答對「叮」
-A.bad.volume  = 0.9;   // 答錯
-A.tick.volume = 0.7;   // 倒數滴答
+  A.bgm.volume  = 0.22;
+  A.ok.volume   = 0.9;
+  A.bad.volume  = 0.9;
+  A.tick.volume = 0.7;
 
-function updateMusicUI(){
-  document.getElementById('musicBtn').textContent = musicOn ? '🔊 Music' : '🔈 Music';
-}
-function updateSfxUI(){
-  document.getElementById('sfxBtn').textContent   = sfxOn   ? '🔔 SFX'   : '🔕 SFX';
-}
-
-function playSfx(which){
-  if (!sfxOn) return;
-  const el = which==='ok' ? A.ok
-           : which==='bad'? A.bad
-           : which==='tick'?A.tick : null;
-
-  // 先嘗試用 <audio> 播 mp3
-  if (el && el.readyState > 0 && !el.error){
-    try { el.currentTime = 0; el.play(); return; } catch {}
+  function updateMusicUI(){
+    document.getElementById('musicBtn').textContent = musicOn ? '🔊 Music' : '🔈 Music';
+    document.getElementById('musicBtn').setAttribute('aria-pressed', musicOn?'true':'false');
   }
-  // mp3 不在或播失敗 → 用 WebAudio 後援
-  if (which==='ok')   sfxOK();
-  if (which==='bad')  sfxBad();
-  if (which==='tick') sfxTick();
-}
+  function updateSfxUI(){
+    document.getElementById('sfxBtn').textContent   = sfxOn   ? '🔔 SFX'   : '🔕 SFX';
+    document.getElementById('sfxBtn').setAttribute('aria-pressed', sfxOn?'true':'false');
+  }
+  function playSfx(which){
+    if (!sfxOn) return;
+    const el = which==='ok' ? A.ok : which==='bad'? A.bad : which==='tick'?A.tick : null;
+    if (el && el.readyState > 0 && !el.error){
+      try { el.currentTime = 0; el.play(); return; } catch {}
+    }
+    // fallback
+    if (which==='ok')   sfxOK();
+    if (which==='bad')  sfxBad();
+    if (which==='tick') sfxTick();
+  }
+  document.getElementById('musicBtn').onclick = async ()=>{
+    musicOn = !musicOn;
+    localStorage.setItem('nm_music', musicOn ? '1':'0');
+    updateMusicUI();
+    if (musicOn){ try{ await A.bgm.play(); }catch{} } else { A.bgm.pause(); }
+  };
+  document.getElementById('sfxBtn').onclick = ()=>{
+    sfxOn = !sfxOn;
+    localStorage.setItem('nm_sfx', sfxOn ? '1':'0');
+    updateSfxUI();
+  };
+  updateMusicUI(); updateSfxUI();
 
-document.getElementById('musicBtn').onclick = async ()=>{
-  musicOn = !musicOn;
-  localStorage.setItem('nm_music', musicOn ? '1':'0');
-  updateMusicUI();
-  if (musicOn){ try{ await A.bgm.play(); }catch{} } else { A.bgm.pause(); }
-};
-document.getElementById('sfxBtn').onclick = ()=>{
-  sfxOn = !sfxOn;
-  localStorage.setItem('nm_sfx', sfxOn ? '1':'0');
-  updateSfxUI();
-};
+  // WebAudio Fallback
+  let AC;
+  function ensureAC(){ AC = AC || new (window.AudioContext || window.webkitAudioContext)(); }
+  function beep(freq, dur, type='sine', gain=0.15){
+    ensureAC();
+    const t = AC.currentTime;
+    const o = AC.createOscillator();
+    const g = AC.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.value = 0;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(gain, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+    o.connect(g).connect(AC.destination);
+    o.start(t); o.stop(t + dur);
+  }
+  function sfxOK(){  beep(880, 0.09, 'sine', 0.18); setTimeout(()=>beep(1320, 0.06, 'sine', 0.16), 70); }
+  function sfxBad(){ beep(220, 0.11, 'square', 0.16); setTimeout(()=>beep(170, 0.12, 'square', 0.16), 90); }
+  function sfxTick(){ beep(1200, 0.045, 'triangle', 0.12); }
 
-updateMusicUI();
-updateSfxUI();
-// ---- WebAudio Fallback：當沒有 mp3 檔時，用合成音 ----
-let AC;
-function ensureAC(){ AC = AC || new (window.AudioContext || window.webkitAudioContext)(); }
-function beep(freq, dur, type='sine', gain=0.15){
-  ensureAC();
-  const t = AC.currentTime;
-  const o = AC.createOscillator();
-  const g = AC.createGain();
-  o.type = type;
-  o.frequency.value = freq;
-  g.gain.value = 0;
-  g.gain.setValueAtTime(0, t);
-  g.gain.linearRampToValueAtTime(gain, t + 0.01);
-  g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
-  o.connect(g).connect(AC.destination);
-  o.start(t);
-  o.stop(t + dur);
-}
-function sfxOK(){    // 叮：兩段小音
-  beep(880, 0.09, 'sine', 0.18);
-  setTimeout(()=>beep(1320, 0.06, 'sine', 0.16), 70);
-}
-function sfxBad(){   // 錯：低頻兩下
-  beep(220, 0.11, 'square', 0.16);
-  setTimeout(()=>beep(170, 0.12, 'square', 0.16), 90);
-}
-function sfxTick(){  // 滴答：短促高頻
-  beep(1200, 0.045, 'triangle', 0.12);
-}  
-  
   // ====== Firebase（可選） ====================================================
   const FIREBASE_CONFIG = {
     apiKey: "AIzaSyAYiGbTXXRyFzmDBKsWb3dA3e1rJphQl2Q",
-  authDomain: "english-night-master.firebaseapp.com",
-  projectId: "english-night-master",
-  appId: "1:1064693294847:web:14b202c657f14636f08eca",
-  storageBucket: "english-night-master.appspot.com", 
-  messagingSenderId: "1064693294847",
-  measurementId: "G-8S28GCQQ78"
+    authDomain: "english-night-master.firebaseapp.com",
+    projectId: "english-night-master",
+    appId: "1:1064693294847:web:14b202c657f14636f08eca",
+    storageBucket: "english-night-master.appspot.com",
+    messagingSenderId: "1064693294847",
+    measurementId: "G-8S28GCQQ78"
   };
   let fb = { app:null, auth:null, db:null, user:null, enabled:false };
   function initFirebase(){
     try{
-      if (!FIREBASE_CONFIG || !FIREBASE_CONFIG.apiKey){ // 離線
+      if (!FIREBASE_CONFIG || !FIREBASE_CONFIG.apiKey){
         document.getElementById('authStatus').textContent = '離線模式';
         document.getElementById('loginBtn').onclick  = ()=> toast('未設定 Firebase，登入停用');
         document.getElementById('logoutBtn').style.display='none';
@@ -381,7 +388,7 @@ function sfxTick(){  // 滴答：短促高頻
           s.textContent = '未登入'; inBtn.style.display=''; outBtn.style.display='none';
         }
       });
-      document.getElementById('loginBtn').onclick = async()=>{ try{ await fb.auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }catch(e){ toast('登入失敗'); } };
+      document.getElementById('loginBtn').onclick  = async()=>{ try{ await fb.auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }catch(e){ toast('登入失敗'); } };
       document.getElementById('logoutBtn').onclick = async()=>{ try{ await fb.auth.signOut(); }catch{} };
     }catch(e){ toast('Firebase 初始化失敗'); }
   }
@@ -391,6 +398,7 @@ function sfxTick(){  // 滴答：短促高頻
   function newProfile(){ return { createdAt:TODAY(), updatedAt:Date.now(), daily:{}, learnedWords:[], xp:0, streak:0, lastDate:'', highScore:0 }; }
   function loadProfileLocal(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY) || 'null') || newProfile(); }catch{ return newProfile(); } }
   let profile = ensureStreak(loadProfileLocal());
+
   function ensureStreak(p){
     const today = TODAY();
     if (p.lastDate !== today){
@@ -409,76 +417,72 @@ function sfxTick(){  // 滴答：短促高頻
       let cloud = snap.exists ? snap.data() : null;
       profile = ensureStreak((cloud && (cloud.updatedAt||0) > (local.updatedAt||0)) ? cloud : local);
       saveProfile();
-    }catch(e){ profile = ensureStreak(local); }
+    }catch{ profile = ensureStreak(local); }
     draw();
   }
   async function saveProfile(){
-    // 去重：避免 learnedWords 被重複加入
     profile.learnedWords = Array.from(new Set((profile.learnedWords || []).map(s => String(s).trim())));
     profile.updatedAt = Date.now();
     localStorage.setItem(STORE_KEY, JSON.stringify(profile));
     if (fb.enabled && fb.user){
-      try{ await fb.db.collection('nightmarket_profiles').doc(fb.user.uid).set(profile, { merge:true }); }catch(e){}
+      try{ await fb.db.collection('nightmarket_profiles').doc(fb.user.uid).set(profile, { merge:true }); }catch{}
     }
   }
-  function incToday(key, by=1){ const t=TODAY(); if (!profile.daily[t]) profile.daily[t]={xp:0,words:0,games:0}; profile.daily[t][key]=(profile.daily[t][key]||0)+by; }
-  function grantXP(v){ profile.xp+=v; incToday('xp', v); }
-  // ====== Daily Scores (per date) ==============================================
+  function incToday(key, by=1){
+    const t=TODAY();
+    profile.daily[t] = profile.daily[t] || {xp:0,words:0,games:0};
+    profile.daily[t][key]=(profile.daily[t][key]||0)+by;
+  }
+  function grantXP(v){ v = Number.isFinite(v)?v:0; profile.xp+=v; incToday('xp', v); }
+
+  // ====== Daily Scores (per date) ============================================
   let dailyScores = JSON.parse(localStorage.getItem('dailyScores') || '{}');
-  function saveDailyScores(){
-  localStorage.setItem('dailyScores', JSON.stringify(dailyScores));
-}
-
-function formatMD(dateStr){
-  const d = new Date(dateStr);
-  const m = d.getMonth() + 1, day = d.getDate();
-  return `${m}/${day}`;
-}
-function getRecentScores(n = 7){
-  const out = [];
-  const today = new Date();
-  for (let i = n - 1; i >= 0; i--){
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    const key = d.toISOString().slice(0,10); // YYYY-MM-DD
-    out.push({ date: key, score: dailyScores[key] });
+  function saveDailyScores(){ localStorage.setItem('dailyScores', JSON.stringify(dailyScores)); }
+  function formatMD(dateStr){
+    const d = new Date(dateStr);
+    const m = d.getMonth() + 1, day = d.getDate();
+    return `${m}/${day}`;
   }
-  return out;
-}
-// ====== Daily Missions (auto-tuned by recent performance) ====================
-const GOAL_KEY = 'nm_goals_v1';
-function goalsFor(dateStr){
-  // 1) 同一天重整頁面，沿用同一組目標（不會越玩越調高）
-  try{
-    const saved = JSON.parse(localStorage.getItem(GOAL_KEY) || '{}');
-    if (saved.date === dateStr && saved.goals) return saved.goals;
-  }catch{}
-
-  // 2) 看「前 3 天」平均，稍微加 20% 當作今天目標
-  let xp=0, words=0, games=0, n=0;
-  const d = new Date(dateStr);
-  for(let i=1;i<=3;i++){
-    const t = new Date(d); t.setDate(d.getDate()-i);
-    const key = t.toISOString().slice(0,10);
-    const row = (profile.daily && profile.daily[key]) || null;
-    if (row){ xp+=(row.xp||0); words+=(row.words||0); games+=(row.games||0); n++; }
+  function getRecentScores(n = 7){
+    const out = [];
+    const today = new Date();
+    for (let i = n - 1; i >= 0; i--){
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const key = d.toISOString().slice(0,10);
+      out.push({ date: key, score: dailyScores[key] });
+    }
+    return out;
   }
 
-  const axp    = n ? xp/n     : 20; // 沒資料就給保守值
-  const awords = n ? words/n  : 6;
-  const agames = n ? games/n  : 1;
+  // ====== Daily Missions ======================================================
+  const GOAL_KEY = 'nm_goals_v1';
+  function goalsFor(dateStr){
+    try{
+      const saved = JSON.parse(localStorage.getItem(GOAL_KEY) || '{}');
+      if (saved.date === dateStr && saved.goals) return saved.goals;
+    }catch{}
+    let xp=0, words=0, games=0, n=0;
+    const d = new Date(dateStr);
+    for(let i=1;i<=3;i++){
+      const t = new Date(d); t.setDate(d.getDate()-i);
+      const key = t.toISOString().slice(0,10);
+      const row = (profile.daily && profile.daily[key]) || null;
+      if (row){ xp+=(row.xp||0); words+=(row.words||0); games+=(row.games||0); n++; }
+    }
+    const axp    = n ? xp/n     : 20;
+    const awords = n ? words/n  : 6;
+    const agames = n ? games/n  : 1;
+    const goals = {
+      xp:     clamp(Math.round((axp   *1.2)/10)*10, 20, 200),
+      words:  clamp(Math.round(awords*1.2)       ,  5,  20),
+      games:  clamp(Math.round(agames*1.2)       ,  1,   5)
+    };
+    localStorage.setItem(GOAL_KEY, JSON.stringify({ date: dateStr, goals }));
+    return goals;
+  }
 
-  const goals = {
-    xp:     clamp(Math.round((axp   *1.2)/10)*10, 20, 200), // 十位數、20~200
-    words:  clamp(Math.round(awords*1.2)       ,  5,  20),  // 5~20 字
-    games:  clamp(Math.round(agames*1.2)       ,  1,   5)   // 1~5 局
-  };
-
-  localStorage.setItem(GOAL_KEY, JSON.stringify({ date: dateStr, goals }));
-  return goals;
-}
   // ====== Words / Topic / Level ==============================================
-  // 只讀 ./words.json；若沒讀到，用較完整的預設資料（多 Topic、多等級），避免只剩 apple
   let TOPICS = {};
   let TOPIC_NAMES = [];
   let WORDS = [];
@@ -510,19 +514,25 @@ function goalsFor(dateStr){
 
   function refreshTopicSelect(){
     topicSel.innerHTML = '';
-    TOPIC_NAMES.forEach(name=>{ const o=document.createElement('option'); o.value=name; o.textContent=name; topicSel.appendChild(o); });
-    if (!TOPIC_NAMES.length){ const o=document.createElement('option'); o.value=''; o.textContent='No topics'; topicSel.appendChild(o); }
-    topicSel.value = currentTopic || TOPIC_NAMES[0] || '';
+    TOPIC_NAMES.forEach(name=>{
+      const o=document.createElement('option'); o.value=name; o.textContent=name; topicSel.appendChild(o);
+    });
+    if (!TOPIC_NAMES.length){
+      const o=document.createElement('option'); o.value=''; o.textContent='No topics'; topicSel.appendChild(o);
+    }
+    topicSel.value = currentTopic && TOPIC_NAMES.includes(currentTopic) ? currentTopic : (TOPIC_NAMES[0] || '');
   }
+
   function applyFilters(){
     const pool = (TOPICS[currentTopic] || []);
     WORDS = (currentLevel==='all') ? pool.slice() : pool.filter(w => (w.level||'easy')===currentLevel);
     wordIndex = 0;
     flash = { deck: shuffle([...WORDS]), showBack:false, current:null, lastFlip:0 };
-    quiz  = { q:null, options:[], correct:0, total:0, feedback:'', deadline:0, lastSecond:null };
+    quiz  = { deck: shuffle([...WORDS]), idx:0, q:null, options:[], correct:0, total:0, feedback:'', deadline:0, lastSecond:null, locked:false };
     if (screen===SCREENS.SNAKE) startGame();
     draw(); saveProfile();
   }
+
   function setTopic(name){ if (!name) return; currentTopic=name; localStorage.setItem('nm_topic', name); applyFilters(); }
   function setLevel(lv){ currentLevel=lv; localStorage.setItem('nm_level', lv); applyFilters(); }
   topicSel.addEventListener('change', e=> setTopic(e.target.value));
@@ -531,35 +541,35 @@ function goalsFor(dateStr){
 
   function isLikelyJsonResponse(res){
     const ct = (res.headers.get('content-type')||'').toLowerCase();
-    // 防止抓到 GitHub blob 的 HTML
     return ct.includes('application/json') || ct.includes('text/json');
   }
   async function loadWords(){
     try{
-      const url = './words.json?v='+Date.now(); // cache-bust
+      const url = './words.json?v='+Date.now();
       const res = await fetch(url, {cache:'no-store'});
       if(!res.ok) throw new Error('HTTP '+res.status);
-      if(!isLikelyJsonResponse(res)){
-        throw new Error('Not JSON (可能抓到 github.com/blob 的 HTML，請用 GitHub Pages 網址)');
-      }
+      if(!isLikelyJsonResponse(res)) throw new Error('Not JSON（請確認 GitHub Pages 網址）');
       let data = await res.json();
       if (Array.isArray(data)) data = { "General": data };
-      // 清洗資料
+      // 清洗
+      const cleaned = {};
       for (const k of Object.keys(data)){
-        data[k] = (data[k]||[]).map(w => ({
-          en:String(w.en||'').trim(),
-          zh:String(w.zh||'').trim(),
-          level:(w.level||'easy').toLowerCase()
+        const arr = Array.isArray(data[k]) ? data[k] : [];
+        const rows = arr.map(w => ({
+          en: String(w?.en || '').trim(),
+          zh: String(w?.zh || '').trim(),
+          level: String(w?.level || 'easy').toLowerCase()
         })).filter(w => w.en && w.zh);
+        if (rows.length) cleaned[k] = rows;
       }
-      TOPICS = data;
+      TOPICS = Object.keys(cleaned).length ? cleaned : DEFAULT_TOPICS;
     }catch(err){
       console.warn('Words load failed → fallback.', err);
       toast('words.json 載入失敗，先用預設字庫（請確認用 Pages 網址）', 4200);
       TOPICS = DEFAULT_TOPICS;
     }
     TOPIC_NAMES = Object.keys(TOPICS);
-    if (!currentTopic || !TOPIC_NAMES.includes(currentTopic)) currentTopic = TOPIC_NAMES[0];
+    if (!currentTopic || !TOPIC_NAMES.includes(currentTopic)) currentTopic = TOPIC_NAMES[0] || '';
     refreshTopicSelect();
     applyFilters();
     wordsReady = true;
@@ -567,35 +577,22 @@ function goalsFor(dateStr){
 
   // ====== Flash / Quiz ========================================================
   function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [a[i],a[j]]=[a[j],a[i]]; } return a; }
-  function nextQuizWord(){
-  // 沒有 deck（理論上不會），就退回用 nextWord()
-  if (!quiz || !Array.isArray(quiz.deck) || !quiz.deck.length) return nextWord();
 
-  const i = quiz.idx % quiz.deck.length;
-  const w = quiz.deck[i];
-  quiz.idx++;
-
-  // 每輪用完一次 deck，就重新洗牌，確保下一輪順序不同
-  if (quiz.idx % quiz.deck.length === 0){
-    quiz.deck = shuffle([...quiz.deck]);
-  }
-  return w;
-}
   function nextWord(){
     if (!WORDS.length) return {en:'loading…', zh:'載入中…'};
-    const w = WORDS[wordIndex % WORDS.length]; wordIndex++; return w;
+    const w = WORDS[wordIndex % WORDS.length];
+    wordIndex++;
+    return w;
   }
 
   let flash = { deck:[], showBack:false, current:null, lastFlip:0 };
- function flipCard(){
-  if (!flash.current) return;
-  flash.showBack = !flash.showBack;
-  // 翻到背面（看到中文）就唸英文
-  if (flash.showBack && flash.current?.en){
-    speakWord(flash.current.en);
+  function flipCard(){
+    if (!flash.current) return;
+    flash.showBack = !flash.showBack;
+    if (flash.showBack && flash.current?.en) speakWord(flash.current.en);
+    draw();
   }
-  draw();
-}
+
   function drawFlash(){
     drawBg(); drawTitle(); buttonsClear(); drawTopBar();
     const w=CANVAS.width, h=CANVAS.height;
@@ -603,6 +600,7 @@ function goalsFor(dateStr){
     const cw=Math.min(540*DPR,w*0.86), ch=Math.min(340*DPR,h*0.52);
     const cx=w/2 - cw/2, cy=topInset()+190*DPR;
     flash.cardRect = { x: cx, y: cy, w: cw, h: ch };
+
     CTX.save(); CTX.translate(cx,cy);
     CTX.fillStyle=COL.card; roundedRect(0,0,cw,ch,24*DPR); CTX.fill(); CTX.strokeStyle=COL.line; CTX.lineWidth=2*DPR; CTX.stroke();
     CTX.textAlign='center';
@@ -629,8 +627,10 @@ function goalsFor(dateStr){
     drawButton('flashKnow', b2, '✅ 我會了 / I got it');
     drawButton('flashPractice', b3, '🧠 需要多練 / Need practice');
 
-    const back=btnRect(w*0.16, h-60*DPR, 220*DPR, 50*DPR); buttons['backMenu']=back; drawButton('backMenu', back, '← 返回 Menu');
+    const back=btnRect(w*0.16, h-60*DPR, 220*DPR, 50*DPR);
+    buttons['backMenu']=back; drawButton('backMenu', back, '← 返回 Menu');
   }
+
   function btnRect(cx,cy,w,h){ return {x:cx-w/2,y:cy-h/2,w,h}; }
   function drawButton(id, rect, label, sublabel=null){
     const isHover = hoverId===id; CTX.save(); CTX.translate(rect.x,rect.y);
@@ -643,14 +643,26 @@ function goalsFor(dateStr){
     CTX.restore();
   }
 
-  let quiz  = { deck: shuffle([...WORDS]), idx: 0, q:null, options:[], correct:0, total:0, feedback:'', deadline:0, lastSecond:null };
+  // Quiz
+  let quiz  = { deck:[], idx:0, q:null, options:[], correct:0, total:0, feedback:'', deadline:0, lastSecond:null, locked:false };
+  function nextQuizWord(){
+    if (!quiz || !Array.isArray(quiz.deck) || !quiz.deck.length) return nextWord();
+    const i = quiz.idx % quiz.deck.length;
+    const w = quiz.deck[i];
+    quiz.idx++;
+    if (quiz.idx % quiz.deck.length === 0) quiz.deck = shuffle([...quiz.deck]);
+    return w;
+  }
   function genQuiz(){
     if (!WORDS.length){ quiz.q=null; return; }
+    if (!quiz.deck.length) quiz.deck = shuffle([...WORDS]);
     const base = nextQuizWord();
     const wrongs=shuffle([...WORDS].filter(w=>w.en!==base.en)).slice(0,3);
     quiz.q=base; quiz.options=shuffle([base, ...wrongs]);
-    const secs=MODES[currentMode].quizTime; quiz.deadline=performance.now()+secs*1000; quiz.lastSecond=Math.ceil(secs);
-    quiz.locked = false;   // 進新題，解鎖
+    const secs=MODES[currentMode].quizTime;
+    quiz.deadline=performance.now()+secs*1000;
+    quiz.lastSecond=Math.ceil(secs);
+    quiz.locked = false;
   }
   function timeLeftMs(){ return Math.max(0, quiz.deadline - performance.now()); }
   function drawQuiz(){
@@ -669,239 +681,238 @@ function goalsFor(dateStr){
     CTX.fillText(`⏱ ${seconds}s`, w/2, cy-24*DPR);
 
     const bw=Math.min(680*DPR,w*0.92), bh=56*DPR, y0=cy+ch+60*DPR;
-    quiz.options.forEach((opt,i)=>{ const r=btnRect(w/2, y0 + i*80*DPR, bw, bh); const id='quizOpt'+i; buttons[id]=r; drawButton(id,r,`${i+1}. ${opt.zh}`); });
+    quiz.options.forEach((opt,i)=>{
+      const r=btnRect(w/2, y0 + i*80*DPR, bw, bh);
+      const id='quizOpt'+i; buttons[id]=r; drawButton(id,r,`${i+1}. ${opt.zh}`);
+    });
 
     CTX.fillStyle=COL.faint; CTX.font=`${14*DPR}px system-ui`; CTX.fillText(`得分 ${quiz.correct}/${quiz.total}`, w/2, h*0.90);
     const back=btnRect(w*0.16, h-60*DPR, 220*DPR, 50*DPR); buttons['backMenu']=back; drawButton('backMenu', back, '← 返回 Menu');
-    if (quiz.feedback){ CTX.fillStyle=quiz.feedback.startsWith('✅')?COL.jade:COL.red; CTX.font=`${18*DPR}px system-ui`; CTX.fillText(quiz.feedback, w/2, h*0.84); }
+    if (quiz.feedback){
+      CTX.fillStyle=quiz.feedback.startsWith('✅')?COL.jade:COL.red; CTX.font=`${18*DPR}px system-ui`; CTX.fillText(quiz.feedback, w/2, h*0.84);
+    }
   }
   function quizChoose(idx){
-    quiz.total++; const pick=quiz.options[idx];
-    if (pick.en===quiz.q.en){
+    if (quiz.locked || !quiz.q) return;
+    quiz.total++;
+    const pick=quiz.options[idx];
+    if (pick && pick.en===quiz.q.en){
       quiz.correct++; quiz.feedback='✅ 正確！+10 XP'; grantXP(10); playSfx('ok');
       if (!profile.learnedWords.includes(pick.en)){ profile.learnedWords.push(pick.en); incToday('words',1); }
     }else{
       quiz.feedback=`❌ 錯誤，正解是「${quiz.q.zh}」`; grantXP(1); playSfx('bad');
     }
-    saveProfile(); setTimeout(()=>{ quiz.feedback=''; genQuiz(); draw(); }, 700);
-  }
-// —— 阿嬤買菜：速度設定 ——
-// 依模式給：起始速度、最小速度、每顆的加速量（會隨分數遞增）
-function snakeSpeed(mode){
-  const base = MODES[mode].snakeTick;          // 既有基準（你原本的速度）
-  return {
-    baseTick:   base,                           // 參考值
-    startTick:  Math.round(base * 1.35),        // 起始更慢：比原來慢 35%
-    minTick:    Math.max(60, Math.round(base * 0.55)), // 最快下限（不可超過）
-    delta0:     1.8,                            // 前期每顆至少加速這麼多（毫秒）
-    deltaGrow:  0.35                            // 分數越高，每顆再多加這麼多
-  };
-}
-// ====== Snake（阿嬤買菜）===================================================
-let game=null;
-
-function startGame(){
-  const size=Math.max(18*DPR, Math.floor(Math.min(CANVAS.width/34, CANVAS.height/30)));
-  const cols=Math.floor(CANVAS.width/size)-4;
-  const rows=Math.floor((CANVAS.height-topInset())/size)-7;
-
-  const sp = snakeSpeed(currentMode); // ← 取本局速度設定
-
-  game={
-    size, cols, rows,
-    ox:Math.floor((CANVAS.width-cols*size)/2),
-    oy:Math.floor((CANVAS.height-rows*size)/2)+20*DPR,
-    dir:{x:1,y:0}, nextDir:{x:1,y:0},
-    snake:[],
-    grocery:null,
-    tickMs: sp.startTick,                 // ← 起始比以前慢（更友善）
-    lastTick:performance.now(),
-    alive:true, score:0,
-    wordOnPickup:null, started:false, paused:false, bannerT:0,
-    speedCfg: sp                          // ← 存起來給後面用
-  };
-
-  const x0=Math.floor(cols/3), y0=Math.floor(rows/2);
-  game.snake=[{x:x0,y:y0},{x:x0-1,y:y0},{x:x0-2,y:y0}];
-  game.grocery=spawnGrocery();
-  incToday('games',0);
-}
-
-function drawSnake(){
-  drawBg(); drawTitle(); buttonsClear(); drawTopBar();
-  if (!game) startGame();
-
-  CTX.save(); CTX.translate(game.ox,game.oy);
-  CTX.fillStyle=COL.ink2; roundedRect(0,0,game.cols*game.size,game.rows*game.size,16*DPR); CTX.fill();
-  CTX.strokeStyle='rgba(255,255,255,0.06)'; CTX.lineWidth=1*DPR; CTX.beginPath();
-  for(let c=1;c<game.cols;c++){ const x=c*game.size; CTX.moveTo(x,0); CTX.lineTo(x,game.rows*game.size); }
-  for(let r=1;r<game.rows;r++){ const y=r*game.size; CTX.moveTo(0,y); CTX.lineTo(game.cols*game.size,y); }
-  CTX.stroke();
-
-  if (game.grocery) drawGrocery(game.grocery.x, game.grocery.y);
-  for(let i=game.snake.length-1;i>=0;i--){
-    const seg=game.snake[i];
-    if(i===0) drawGrandma(seg.x,seg.y,game.dir);
-    else drawCart(seg.x,seg.y,i);
-  }
-  CTX.restore();
-
-  // HUD
-  const w=CANVAS.width;
-  CTX.fillStyle=COL.white; CTX.textAlign='center'; CTX.font=`${18*DPR}px system-ui`;
-
-  // HUD：把分數畫在棋盤內右上角，不擋標題
-  {
-    const pad = 10*DPR;
-    const text = `Score ${game.score}`;
-    CTX.font = `${14*DPR}px system-ui`;
-    const m = CTX.measureText(text);
-    const bx = game.ox + game.cols*game.size - (m.width + pad*2) - 10*DPR;
-    const by = game.oy + 10*DPR;
-    const bw = m.width + pad*2;
-    const bh = 24*DPR;
-
-    CTX.fillStyle = 'rgba(0,0,0,0.35)';
-    roundedRect(bx, by, bw, bh, 12*DPR);
-    CTX.fill();
-    CTX.strokeStyle = '#ff5fa2';
-    CTX.lineWidth = 2*DPR;
-    CTX.stroke();
-    CTX.fillStyle = '#fff';
-    CTX.textAlign = 'center';
-    CTX.fillText(text, bx + bw/2, by + bh/2 + 4*DPR);
-  }
-
-  if (!game.started){
-    CTX.fillStyle=COL.faint; CTX.font=`${16*DPR}px system-ui`;
-    CTX.fillText('按方向鍵開始 · Use arrow keys to start', w/2, game.oy+game.rows*game.size+26*DPR);
-  } else if (game.paused){
-    CTX.fillStyle=COL.faint; CTX.font=`${16*DPR}px system-ui`;
-    CTX.fillText('暫停中 · Press P to resume', w/2, game.oy+game.rows*game.size+26*DPR);
-  } else {
-    CTX.fillStyle=COL.dim; CTX.font=`${12*DPR}px system-ui`;
-    CTX.fillText('P 暫停 / R 重來 / M Menu', w/2, game.oy+game.rows*game.size+24*DPR);
-  }
-}
-
-function drawGrandma(gx,gy,dir){
-  const s=game.size, x=gx*s, y=gy*s; CTX.save(); CTX.translate(x,y);
-  CTX.fillStyle='#7c8ba1'; roundedRect(2,2,s-4,s-4,8*DPR); CTX.fill();
-  CTX.save(); CTX.translate(s/2,s/2);
-  CTX.fillStyle='#ffd9c2'; CTX.beginPath(); CTX.arc(0,0,s*0.28,0,Math.PI*2); CTX.fill();
-  CTX.fillStyle='#a7b0bd'; CTX.beginPath(); CTX.arc(0,-s*0.22,s*0.10,0,Math.PI*2); CTX.fill();
-  CTX.beginPath(); CTX.arc(0,0,s*0.30,Math.PI*0.7,Math.PI*0.3,true); CTX.strokeStyle='#9aa6b2'; CTX.lineWidth=4*DPR; CTX.stroke();
-  CTX.fillStyle='#3a3a3a'; const ex=s*0.10, ey=-s*0.02; CTX.beginPath(); CTX.arc(-ex,ey,2.5*DPR,0,Math.PI*2); CTX.fill(); CTX.beginPath(); CTX.arc(ex,ey,2.5*DPR,0,Math.PI*2); CTX.fill();
-  CTX.strokeStyle='#c05b6e'; CTX.lineWidth=2.2*DPR; CTX.beginPath(); CTX.arc(0,s*0.06,s*0.10,0,Math.PI); CTX.stroke();
-  CTX.restore();
-  CTX.strokeStyle='rgba(255,255,255,0.6)'; CTX.lineWidth=2*DPR; CTX.beginPath();
-  const cx=s/2, cy=s*0.82;
-  if (dir.x===1){ CTX.moveTo(cx-7,cy); CTX.lineTo(cx+7,cy); CTX.lineTo(cx+1,cy-6); }
-  if (dir.x===-1){ CTX.moveTo(cx+7,cy); CTX.lineTo(cx-7,cy); CTX.lineTo(cx-1,cy-6); }
-  if (dir.y===1){ CTX.moveTo(cx,cy-10); CTX.lineTo(cx,cy+8); CTX.lineTo(cx-6,cy+2); }
-  if (dir.y===-1){ CTX.moveTo(cx,cy+8); CTX.lineTo(cx,cy-10); CTX.lineTo(cx-6,cy-4); }
-  CTX.stroke(); CTX.restore();
-}
-
-function drawCart(gx,gy,i){
-  const s=game.size, x=gx*s, y=gy*s; CTX.save(); CTX.translate(x,y);
-  CTX.fillStyle=i%2?'#567':'#495871'; roundedRect(4,4,s-8,s-8,6*DPR); CTX.fill();
-  CTX.fillStyle='#222'; CTX.beginPath(); CTX.arc(8,s-6,3*DPR,0,2*Math.PI); CTX.fill(); CTX.beginPath(); CTX.arc(s-8,s-6,3*DPR,0,2*Math.PI); CTX.fill();
-  CTX.restore();
-}
-
-function drawGrocery(gx,gy){
-  const s=game.size, x=gx*s, y=gy*s; CTX.save(); CTX.translate(x,y);
-  CTX.fillStyle='#d7a96b'; roundedRect(4,6,s-8,s-10,6*DPR); CTX.fill(); CTX.strokeStyle='rgba(0,0,0,0.2)'; CTX.stroke();
-  CTX.fillStyle='#5fd16b'; CTX.beginPath(); CTX.arc(s*0.35,8,4*DPR,0,2*Math.PI); CTX.fill();
-  CTX.fillStyle='#ff6b6b'; CTX.beginPath(); CTX.arc(s*0.6,9,4*DPR,0,2*Math.PI); CTX.fill();
-  CTX.restore();
-}
-
-function spawnGrocery(){
-  let x,y,ok=false; while(!ok){ x=(Math.random()*game.cols)|0; y=(Math.random()*game.rows)|0; ok=!game.snake.some(s=>s.x===x&&s.y===y); }
-  return {x,y};
-}
-
-function showPickupBanner(word){
-  const el = document.getElementById('pickup');
-  el.querySelector('.en').textContent = word.en;
-  el.querySelector('.zh').textContent = word.zh;
-  el.style.opacity = '1';
-  el.classList.add('show');
-  clearTimeout(el._t);
-  el._t = setTimeout(()=>{ el.style.opacity='0'; setTimeout(()=>{ el.classList.remove('show'); }, 200); }, 1100);
-}
-
-function stepGame(now){
-  if (!game || !game.alive || game.paused) return;
-
-  const dt=now - game.lastTick;
-  if (dt < game.tickMs) return;
-
-  game.lastTick=now;
-  game.dir=game.nextDir;
-
-  const head={...game.snake[0]};
-  head.x+=game.dir.x; head.y+=game.dir.y;
-
-  if (head.x<0||head.y<0||head.x>=game.cols||head.y>=game.rows) return gameOver();
-  if (game.snake.some(s=>s.x===head.x&&s.y===head.y)) return gameOver();
-
-  game.snake.unshift(head);
-
-  if (head.x===game.grocery.x && head.y===game.grocery.y){
-    // —— 吃到 —— //
-    game.score++;
-    profile.highScore=Math.max(profile.highScore||0, game.score);
-
-    if (game.score===1) incToday('games',1);
-    grantXP(5);
-
-    const word=nextWord();
-    showPickupBanner(word);
-    if (!profile.learnedWords.includes(word.en)){
-      profile.learnedWords.push(word.en);
-      incToday('words',1);
-    }
+    quiz.locked = true;
     saveProfile();
-    speakWord(word.en);
-
-    game.grocery=spawnGrocery();
-
-    // —— 速度：分數越高，每顆加速越多，並且有最小下限 —— //
-    const sp = game.speedCfg || snakeSpeed(currentMode);
-    const speedUp = sp.delta0 + sp.deltaGrow * Math.min(game.score, 30); // 封頂避免暴衝
-    game.tickMs = Math.max(sp.minTick, game.tickMs - speedUp);
-
-  }else{
-    game.snake.pop();
+    setTimeout(()=>{ quiz.feedback=''; genQuiz(); draw(); }, 700);
   }
-}
 
-function gameOver(){
-  // ➊ 記錄今天最高分
-  const d = TODAY();
-  const best = Math.max(dailyScores[d] || 0, game.score);
-  dailyScores[d] = best;
-  saveDailyScores();
+  // ====== Snake（阿嬤買菜）===================================================
+  function snakeSpeed(mode){
+    const base = MODES[mode].snakeTick;
+    return {
+      baseTick:   base,
+      startTick:  Math.round(base * 1.35),
+      minTick:    Math.max(60, Math.round(base * 0.55)),
+      delta0:     1.8,
+      deltaGrow:  0.35
+    };
+  }
+  let game=null;
 
-  game.alive=false;
-  grantXP(3);
-  saveProfile();
+  function startGame(){
+    const size=Math.max(18*DPR, Math.floor(Math.min(CANVAS.width/34, CANVAS.height/30)));
+    const cols=Math.floor(CANVAS.width/size)-4;
+    const rows=Math.floor((CANVAS.height-topInset())/size)-7;
+    const sp = snakeSpeed(currentMode);
 
-  const w=CANVAS.width, h=CANVAS.height;
-  CTX.fillStyle='rgba(0,0,0,0.5)'; CTX.fillRect(0,0,w,h);
-  CTX.fillStyle=COL.white; CTX.textAlign='center'; CTX.font=`${28*DPR}px system-ui`;
-  CTX.fillText('遊戲結束 · Game Over', w/2, h/2-30*DPR);
-  CTX.font=`${18*DPR}px system-ui`;
-  CTX.fillText(`分數 Score: ${game.score}   最高 High: ${profile.highScore}`, w/2, h/2+6*DPR);
-  CTX.fillText('按 R 重新開始 · Press R to restart', w/2, h/2+36*DPR);
-}
+    game={
+      size, cols, rows,
+      ox:Math.floor((CANVAS.width-cols*size)/2),
+      oy:Math.floor((CANVAS.height-rows*size)/2)+20*DPR,
+      dir:{x:1,y:0}, nextDir:{x:1,y:0},
+      snake:[],
+      grocery:null,
+      tickMs: sp.startTick,
+      lastTick:performance.now(),
+      alive:true, score:0,
+      wordOnPickup:null, started:false, paused:false, bannerT:0,
+      speedCfg: sp
+    };
+    const x0=Math.floor(cols/3), y0=Math.floor(rows/2);
+    game.snake=[{x:x0,y:y0},{x:x0-1,y:y0},{x:x0-2,y:y0}];
+    game.grocery=spawnGrocery();
+    incToday('games',0);
+  }
+
+  function drawSnake(){
+    drawBg(); drawTitle(); buttonsClear(); drawTopBar();
+    if (!game) startGame();
+
+    CTX.save(); CTX.translate(game.ox,game.oy);
+    CTX.fillStyle=COL.ink2; roundedRect(0,0,game.cols*game.size,game.rows*game.size,16*DPR); CTX.fill();
+    CTX.strokeStyle='rgba(255,255,255,0.06)'; CTX.lineWidth=1*DPR; CTX.beginPath();
+    for(let c=1;c<game.cols;c++){ const x=c*game.size; CTX.moveTo(x,0); CTX.lineTo(x,game.rows*game.size); }
+    for(let r=1;r<game.rows;r++){ const y=r*game.size; CTX.moveTo(0,y); CTX.lineTo(game.cols*game.size,y); }
+    CTX.stroke();
+
+    if (game.grocery) drawGrocery(game.grocery.x, game.grocery.y);
+    for(let i=game.snake.length-1;i>=0;i--){
+      const seg=game.snake[i];
+      if(i===0) drawGrandma(seg.x,seg.y,game.dir);
+      else drawCart(seg.x,seg.y,i);
+    }
+    CTX.restore();
+
+    const w=CANVAS.width;
+    // HUD（棋盤內右上角）
+    {
+      const pad = 10*DPR;
+      const text = `Score ${game.score}`;
+      CTX.font = `${14*DPR}px system-ui`;
+      const m = CTX.measureText(text);
+      const bx = game.ox + game.cols*game.size - (m.width + pad*2) - 10*DPR;
+      const by = game.oy + 10*DPR;
+      const bw = m.width + pad*2;
+      const bh = 24*DPR;
+
+      CTX.fillStyle = 'rgba(0,0,0,0.35)'; roundedRect(bx, by, bw, bh, 12*DPR); CTX.fill();
+      CTX.strokeStyle = '#ff5fa2'; CTX.lineWidth = 2*DPR; CTX.stroke();
+      CTX.fillStyle = '#fff'; CTX.textAlign = 'center';
+      CTX.fillText(text, bx + bw/2, by + bh/2 + 4*DPR);
+    }
+
+    if (!game.started){
+      CTX.fillStyle=COL.faint; CTX.font=`${16*DPR}px system-ui`;
+      CTX.textAlign='center';
+      CTX.fillText('按方向鍵開始 · Use arrow keys to start', w/2, game.oy+game.rows*game.size+26*DPR);
+    } else if (game.paused){
+      CTX.fillStyle=COL.faint; CTX.font=`${16*DPR}px system-ui`;
+      CTX.textAlign='center';
+      CTX.fillText('暫停中 · Press P to resume', w/2, game.oy+game.rows*game.size+26*DPR);
+    } else {
+      CTX.fillStyle=COL.dim; CTX.font=`${12*DPR}px system-ui`;
+      CTX.textAlign='center';
+      CTX.fillText('P 暫停 / R 重來 / M Menu', w/2, game.oy+game.rows*game.size+24*DPR);
+    }
+  }
+
+  function drawGrandma(gx,gy,dir){
+    const s=game.size, x=gx*s, y=gy*s; CTX.save(); CTX.translate(x,y);
+    CTX.fillStyle='#7c8ba1'; roundedRect(2,2,s-4,s-4,8*DPR); CTX.fill();
+    CTX.save(); CTX.translate(s/2,s/2);
+    CTX.fillStyle='#ffd9c2'; CTX.beginPath(); CTX.arc(0,0,s*0.28,0,Math.PI*2); CTX.fill();
+    CTX.fillStyle='#a7b0bd'; CTX.beginPath(); CTX.arc(0,-s*0.22,s*0.10,0,Math.PI*2); CTX.fill();
+    CTX.beginPath(); CTX.arc(0,0,s*0.30,Math.PI*0.7,Math.PI*0.3,true); CTX.strokeStyle='#9aa6b2'; CTX.lineWidth=4*DPR; CTX.stroke();
+    CTX.fillStyle='#3a3a3a'; const ex=s*0.10, ey=-s*0.02;
+    CTX.beginPath(); CTX.arc(-ex,ey,2.5*DPR,0,Math.PI*2); CTX.fill();
+    CTX.beginPath(); CTX.arc(ex,ey,2.5*DPR,0,Math.PI*2); CTX.fill();
+    CTX.strokeStyle='#c05b6e'; CTX.lineWidth=2.2*DPR; CTX.beginPath(); CTX.arc(0,s*0.06,s*0.10,0,Math.PI); CTX.stroke();
+    CTX.restore();
+    CTX.strokeStyle='rgba(255,255,255,0.6)'; CTX.lineWidth=2*DPR; CTX.beginPath();
+    const cx=s/2, cy=s*0.82;
+    if (dir.x===1){ CTX.moveTo(cx-7,cy); CTX.lineTo(cx+7,cy); CTX.lineTo(cx+1,cy-6); }
+    if (dir.x===-1){ CTX.moveTo(cx+7,cy); CTX.lineTo(cx-7,cy); CTX.lineTo(cx-1,cy-6); }
+    if (dir.y===1){ CTX.moveTo(cx,cy-10); CTX.lineTo(cx,cy+8); CTX.lineTo(cx-6,cy+2); }
+    if (dir.y===-1){ CTX.moveTo(cx,cy+8); CTX.lineTo(cx,cy-10); CTX.lineTo(cx-6,cy-4); }
+    CTX.stroke(); CTX.restore();
+  }
+  function drawCart(gx,gy,i){
+    const s=game.size, x=gx*s, y=gy*s; CTX.save(); CTX.translate(x,y);
+    CTX.fillStyle=i%2?'#567':'#495871'; roundedRect(4,4,s-8,s-8,6*DPR); CTX.fill();
+    CTX.fillStyle='#222'; CTX.beginPath(); CTX.arc(8,s-6,3*DPR,0,2*Math.PI); CTX.fill();
+    CTX.beginPath(); CTX.arc(s-8,s-6,3*DPR,0,2*Math.PI); CTX.fill();
+    CTX.restore();
+  }
+  function drawGrocery(gx,gy){
+    const s=game.size, x=gx*s, y=gy*s; CTX.save(); CTX.translate(x,y);
+    CTX.fillStyle='#d7a96b'; roundedRect(4,6,s-8,s-10,6*DPR); CTX.fill(); CTX.strokeStyle='rgba(0,0,0,0.2)'; CTX.stroke();
+    CTX.fillStyle='#5fd16b'; CTX.beginPath(); CTX.arc(s*0.35,8,4*DPR,0,2*Math.PI); CTX.fill();
+    CTX.fillStyle='#ff6b6b'; CTX.beginPath(); CTX.arc(s*0.6,9,4*DPR,0,2*Math.PI); CTX.fill();
+    CTX.restore();
+  }
+  function spawnGrocery(){
+    let x,y,ok=false;
+    while(!ok){
+      x=(Math.random()*game.cols)|0; y=(Math.random()*game.rows)|0;
+      ok=!game.snake.some(s=>s.x===x&&s.y===y);
+    }
+    return {x,y};
+  }
+
+  function showPickupBanner(word){
+    const el = document.getElementById('pickup');
+    el.querySelector('.en').textContent = word.en;
+    el.querySelector('.zh').textContent = word.zh;
+    el.style.opacity = '1';
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(()=>{ el.style.opacity='0'; setTimeout(()=>{ el.classList.remove('show'); }, 200); }, 1100);
+  }
+
+  function stepGame(now){
+    if (!game || !game.alive || game.paused) return;
+    const dt=now - game.lastTick;
+    if (dt < game.tickMs) return;
+    game.lastTick=now;
+    game.dir=game.nextDir;
+
+    const head={...game.snake[0]};
+    head.x+=game.dir.x; head.y+=game.dir.y;
+
+    if (head.x<0||head.y<0||head.x>=game.cols||head.y>=game.rows) return gameOver();
+    if (game.snake.some(s=>s.x===head.x&&s.y===head.y)) return gameOver();
+
+    game.snake.unshift(head);
+
+    if (head.x===game.grocery.x && head.y===game.grocery.y){
+      game.score++;
+      profile.highScore=Math.max(profile.highScore||0, game.score);
+      if (game.score===1) incToday('games',1);
+      grantXP(5);
+
+      const word=nextWord();
+      showPickupBanner(word);
+      if (!profile.learnedWords.includes(word.en)){
+        profile.learnedWords.push(word.en);
+        incToday('words',1);
+      }
+      saveProfile();
+      speakWord(word.en);
+
+      game.grocery=spawnGrocery();
+
+      const sp = game.speedCfg || snakeSpeed(currentMode);
+      const speedUp = sp.delta0 + sp.deltaGrow * Math.min(game.score, 30);
+      game.tickMs = Math.max(sp.minTick, game.tickMs - speedUp);
+    }else{
+      game.snake.pop();
+    }
+  }
+
+  function gameOver(){
+    const d = TODAY();
+    const best = Math.max(dailyScores[d] || 0, game.score);
+    dailyScores[d] = best;
+    saveDailyScores();
+
+    game.alive=false;
+    grantXP(3);
+    saveProfile();
+
+    const w=CANVAS.width, h=CANVAS.height;
+    CTX.fillStyle='rgba(0,0,0,0.5)'; CTX.fillRect(0,0,w,h);
+    CTX.fillStyle=COL.white; CTX.textAlign='center'; CTX.font=`${28*DPR}px system-ui`;
+    CTX.fillText('遊戲結束 · Game Over', w/2, h/2-30*DPR);
+    CTX.font=`${18*DPR}px system-ui`;
+    CTX.fillText(`分數 Score: ${game.score}   最高 High: ${profile.highScore}`, w/2, h/2+6*DPR);
+    CTX.fillText('按 R 重新開始 · Press R to restart', w/2, h/2+36*DPR);
+  }
 
   // ====== UI: 菜單 / 儀表板 ===================================================
   const SCREENS = { MENU:'menu', DASH:'dash', FLASH:'flash', QUIZ:'quiz', SNAKE:'snake' };
   let screen = SCREENS.MENU, hoverId=null; const buttons={};
+
   function drawTopBar(){
     const w=CANVAS.width; const yTop = topInset()+86*DPR;
     drawStatPill(w*0.10,yTop,'Streak 連續天數', profile.streak, '#ffcf59');
@@ -916,7 +927,8 @@ function gameOver(){
     CTX.font=`${12*DPR}px system-ui`; const m=CTX.measureText(text); const w=m.width+pad*2, h=24*DPR;
     CTX.fillStyle='rgba(0,0,0,0.35)'; roundedRect(0,0,w,h,12*DPR); CTX.fill();
     CTX.strokeStyle=color; CTX.lineWidth=2*DPR; CTX.stroke();
-    CTX.fillStyle=COL.white; CTX.textAlign='center'; CTX.fillText(text,w/2,h/2+4*DPR); CTX.restore();
+    CTX.fillStyle=COL.white; CTX.textAlign='center'; CTX.fillText(text,w/2,h/2+4*DPR);
+    CTX.restore();
   }
   function drawMenu(){
     drawBg(); drawTitle(); buttonsClear(); drawTopBar();
@@ -928,26 +940,32 @@ function gameOver(){
       {id:'toSnake', y: sectionTop+340*DPR, label:'🛒 阿嬤買菜遊戲 (Snake)',   sub:'方向鍵操控 · 撿到就發音'}
     ];
     const rectW = Math.min(w*0.72, 740*DPR), rectH = 68*DPR;
-    B.forEach(b=>{ const rect={x:w/2-rectW/2,y:b.y-rectH/2,w:rectW,h:rectH}; buttons[b.id]=rect; drawButton(b.id,rect,b.label,b.sub); });
+    B.forEach(b=>{
+      const rect={x:w/2-rectW/2,y:b.y-rectH/2,w:rectW,h:rectH};
+      buttons[b.id]=rect; drawButton(b.id,rect,b.label,b.sub);
+    });
     const today = profile.daily[TODAY()] || { xp: 0 };
     const goals = goalsFor(TODAY());
     const pct   = clamp((today.xp || 0) / goals.xp, 0, 1);
     drawProgressRing(w*0.85, sectionTop - 50*DPR, 48*DPR, pct, `今日XP ${today.xp || 0}/${goals.xp}`);
   }
   function shortenNumber(num) {
-  if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
-  if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
-  if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
-  return num;
-}
+    if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
+    if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
+    if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+    return num;
+  }
   function drawDash(){
     drawBg(); drawTitle(); buttonsClear(); drawTopBar();
     const w=CANVAS.width; const startY=topInset()+170*DPR;
     function card(cx,y,ww,hh,title,lines){
       const x=cx-ww/2; CTX.save(); CTX.translate(x,y);
-      CTX.fillStyle=COL.card; roundedRect(0,0,ww,hh,18*DPR); CTX.fill(); CTX.strokeStyle=COL.line; CTX.lineWidth=2*DPR; CTX.stroke();
+      CTX.fillStyle=COL.card; roundedRect(0,0,ww,hh,18*DPR); CTX.fill();
+      CTX.strokeStyle=COL.line; CTX.lineWidth=2*DPR; CTX.stroke();
       CTX.fillStyle=COL.white; CTX.textAlign='left'; CTX.font=`${16*DPR}px system-ui`; CTX.fillText(title,20*DPR,34*DPR);
-      CTX.font=`${13*DPR}px system-ui`; CTX.fillStyle=COL.faint; lines.forEach((ln,i)=> CTX.fillText(ln,20*DPR,60*DPR+i*20*DPR)); CTX.restore();
+      CTX.font=`${13*DPR}px system-ui`; CTX.fillStyle=COL.faint;
+      lines.forEach((ln,i)=> CTX.fillText(ln,20*DPR,60*DPR+i*20*DPR));
+      CTX.restore();
     }
     const today = profile.daily[TODAY()] || {xp:0,words:0,games:0};
     const ww=Math.min(w*0.36,520*DPR), hh=160*DPR;
@@ -962,92 +980,74 @@ function gameOver(){
       `累積 XP：${shortenNumber(profile.xp)}`,
       `已學單字：${profile.learnedWords.length}`
     ]);
-    
-// ==== 最近 7 天分數卡（保證下面按鈕一定有空間） ====
-const recentAll = getRecentScores(7);
-let linesAll = recentAll.map(r => `${formatMD(r.date)}：${(r.score ?? 0)} 分`);
 
-const yRecent   = startY + hh + 40 * DPR;
-const wwRecent  = Math.min(w * 0.72, 740 * DPR);
+    // 最近 7 天
+    const recentAll = getRecentScores(7);
+    let linesAll = recentAll.map(r => `${formatMD(r.date)}：${(r.score ?? 0)} 分`);
+    const yRecent   = startY + hh + 40 * DPR;
+    const wwRecent  = Math.min(w * 0.72, 740 * DPR);
+    const titleH     = 30 * DPR;
+    const lineHeight = 20 * DPR;
+    const pad        = 20 * DPR;
 
-// 卡片基本排版參數
-const titleH     = 30 * DPR;
-const lineHeight = 20 * DPR;
-const pad        = 20 * DPR;
+    const totalButtons = 4;
+    const bottomPad = 18 * DPR;
+    const minBtnH = 46 * DPR;
+    const minGap  = 12 * DPR;
+    const minButtonsBlock = totalButtons * minBtnH + (totalButtons - 1) * minGap + bottomPad;
 
-// === 下面按鈕區的「最小需求」 ===
-const totalButtons = 4;
-const bottomPad = 18 * DPR;
-const minBtnH = 46 * DPR;
-const minGap  = 12 * DPR;
-const minButtonsBlock = totalButtons * minBtnH + (totalButtons - 1) * minGap + bottomPad;
+    const pageAvail = CANVAS.height - yRecent;
+    let recentAvail = Math.max(80 * DPR, pageAvail - minButtonsBlock);
+    let maxRecentH  = Math.min(300 * DPR, recentAvail);
+    let maxLines = Math.floor((maxRecentH - (pad * 2 + titleH)) / lineHeight);
+    maxLines = Math.max(1, Math.min(7, maxLines));
+    const linesShown = linesAll.slice(-maxLines);
+    let hhRecent = pad * 2 + titleH + linesShown.length * lineHeight;
+    hhRecent = Math.min(hhRecent, maxRecentH);
 
-// 這一頁還剩多少垂直空間可以用在「最近 7 天卡片 + 按鈕」
-const pageAvail = CANVAS.height - yRecent;
+    card(w * 0.50, yRecent, wwRecent, hhRecent, '最近 7 天', linesShown);
 
-// 先預留按鈕的最小空間，剩下才給「最近 7 天」卡片
-let recentAvail = Math.max(80 * DPR, pageAvail - minButtonsBlock); // 至少留一點高度
-let maxRecentH  = Math.min(300 * DPR, recentAvail);
+    // 按鈕
+    const rectW  = Math.min(w * 0.7, 740 * DPR);
+    let btnH = 60 * DPR,  maxBtnH = 64 * DPR;
+    let gap  = 26 * DPR,  maxGap  = 36 * DPR;
+    const avail = CANVAS.height - (yRecent + hhRecent) - bottomPad;
 
-// 依可用高度決定可顯示的行數，必要時縮減行數
-let maxLines = Math.floor((maxRecentH - (pad * 2 + titleH)) / lineHeight);
-maxLines = Math.max(1, Math.min(7, maxLines));
-const linesShown = linesAll.slice(-maxLines);
+    (function fit(){
+      let need = totalButtons * btnH + (totalButtons - 1) * gap;
+      if (need <= avail) return;
+      const extra = need - avail;
+      const canShrinkGap = (gap - minGap) * (totalButtons - 1);
+      if (canShrinkGap > 0){
+        const d = Math.min(extra, canShrinkGap);
+        gap = Math.max(minGap, gap - d / (totalButtons - 1));
+      }
+      need = totalButtons * btnH + (totalButtons - 1) * gap;
+      if (need > avail){
+        const extra2 = need - avail;
+        const canShrinkBtn = (btnH - minBtnH) * totalButtons;
+        const d2 = Math.min(extra2, canShrinkBtn);
+        btnH = Math.max(minBtnH, btnH - d2 / totalButtons);
+      }
+      btnH = Math.min(btnH, maxBtnH);
+      gap  = Math.min(gap,  maxGap);
+    })();
 
-// 依行數回推實際卡片高度（不超過 maxRecentH）
-let hhRecent = pad * 2 + titleH + linesShown.length * lineHeight;
-hhRecent = Math.min(hhRecent, maxRecentH);
+    const used = totalButtons * btnH + (totalButtons - 1) * gap;
+    const yStart = yRecent + hhRecent + Math.max(minGap, (avail - used) / 2);
 
-// 畫卡片
-card(w * 0.50, yRecent, wwRecent, hhRecent, '最近 7 天', linesShown);
-
-// === 自適應按鈕區：一定塞得下畫面 ===
-const rectW  = Math.min(w * 0.7, 740 * DPR);
-let btnH = 60 * DPR,  maxBtnH = 64 * DPR;
-let gap  = 26 * DPR,  maxGap  = 36 * DPR;
-
-const avail = CANVAS.height - (yRecent + hhRecent) - bottomPad;
-
-// 先把需要的高度算出來，再按需縮 gap / btnH
-(function fit(){
-  let need = totalButtons * btnH + (totalButtons - 1) * gap;
-  if (need <= avail) return;
-
-  const extra = need - avail;
-  const canShrinkGap = (gap - minGap) * (totalButtons - 1);
-  if (canShrinkGap > 0){
-    const d = Math.min(extra, canShrinkGap);
-    gap = Math.max(minGap, gap - d / (totalButtons - 1));
+    [
+      {id:'backMenu', label:'← 返回 Menu'},
+      {id:'toFlash',  label:'🃏 開始閃卡'},
+      {id:'toQuiz',   label:'📝 開始測驗'},
+      {id:'toSnake',  label:'🛒 開始阿嬤買菜'}
+    ].forEach((b, i) => {
+      const centerY = yStart + i * (btnH + gap) + btnH / 2;
+      const r = { x: w/2 - rectW/2, y: centerY - btnH/2, w: rectW, h: btnH };
+      buttons[b.id] = r;
+      drawButton(b.id, r, b.label);
+    });
   }
-
-  need = totalButtons * btnH + (totalButtons - 1) * gap;
-  if (need > avail){
-    const extra2 = need - avail;
-    const canShrinkBtn = (btnH - minBtnH) * totalButtons;
-    const d2 = Math.min(extra2, canShrinkBtn);
-    btnH = Math.max(minBtnH, btnH - d2 / totalButtons);
-  }
-
-  btnH = Math.min(btnH, maxBtnH);
-  gap  = Math.min(gap,  maxGap);
-})();
-
-// 垂直置中剩餘空間（就算很擠也會出現）
-const used = totalButtons * btnH + (totalButtons - 1) * gap;
-const yStart = yRecent + hhRecent + Math.max(minGap, (avail - used) / 2);
-
-[
-  {id:'backMenu', label:'← 返回 Menu'},
-  {id:'toFlash',  label:'🃏 開始閃卡'},
-  {id:'toQuiz',   label:'📝 開始測驗'},
-  {id:'toSnake',  label:'🛒 開始阿嬤買菜'}
-].forEach((b, i) => {
-  const centerY = yStart + i * (btnH + gap) + btnH / 2;
-  const r = { x: w/2 - rectW/2, y: centerY - btnH/2, w: rectW, h: btnH };
-  buttons[b.id] = r;
-  drawButton(b.id, r, b.label);
-});
-}
 
   function drawProgressRing(cx,cy,r,pct,label){
     CTX.save(); CTX.translate(cx,cy);
@@ -1058,18 +1058,27 @@ const yStart = yRecent + hhRecent + Math.max(minGap, (avail - used) / 2);
 
   // ====== Input / Loop ========================================================
   function buttonsClear(){ for (const k of Object.keys(buttons)) delete buttons[k]; }
+
   CANVAS.addEventListener('mousemove',(e)=>{
-    const rect=CANVAS.getBoundingClientRect(); const x=(e.clientX-rect.left)*DPR; const y=(e.clientY-rect.top)*DPR;
-    hoverId=null; for (const [id,r] of Object.entries(buttons)){ if (x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h){ hoverId=id; break; } } draw();
-  });
+    const rect=CANVAS.getBoundingClientRect();
+    const x=(e.clientX-rect.left)*DPR; const y=(e.clientY-rect.top)*DPR;
+    hoverId=null;
+    for (const [id,r] of Object.entries(buttons)){
+      if (x>=r.x&&x<=r.x+r.w&&y>=r.y&&y<=r.y+r.h){ hoverId=id; break; }
+    }
+    draw();
+  }, { passive:true });
+
   CANVAS.addEventListener('keydown',(e)=>{
     if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
-    // 在 keydown 監聽裡、e.preventDefault() 後面加
-if (screen === SCREENS.QUIZ && ['1','2','3','4'].includes(e.key)) {
-  const idx = +e.key - 1;
-  if (quiz?.options?.[idx]) quizChoose(idx);
-  return;
-}
+
+    // Quiz 快速鍵 1–4
+    if (screen === SCREENS.QUIZ && ['1','2','3','4'].includes(e.key)) {
+      const idx = +e.key - 1;
+      if (quiz?.options?.[idx]) quizChoose(idx);
+      return;
+    }
+
     if (screen===SCREENS.SNAKE && game){
       if (!game.started && ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) game.started=true;
       if (e.key==='ArrowUp'   && game.dir.y!==1)  game.nextDir={x:0,y:-1};
@@ -1083,28 +1092,57 @@ if (screen === SCREENS.QUIZ && ['1','2','3','4'].includes(e.key)) {
     if (e.key==='Escape'){ screen=SCREENS.MENU; }
     if (screen===SCREENS.FLASH && e.key===' '){ flash.showBack=!flash.showBack; draw(); }
   });
+
+  CANVAS.addEventListener('click', (e)=>{
+    CANVAS.focus(); // 讓鍵盤操作立即可用
+    const rect = CANVAS.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * DPR;
+    const y = (e.clientY - rect.top)  * DPR;
+    if (screen === SCREENS.FLASH && flash.cardRect){
+      const r = flash.cardRect;
+      if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h){
+        flipCard();
+        return;
+      }
+    }
+    if (!hoverId) return;
+    handleButton(hoverId);
+  });
+
   function handleButton(id){
     switch(id){
-      case 'toDash': screen=SCREENS.DASH; break;
+      case 'toDash':  screen=SCREENS.DASH; break;
       case 'toFlash': screen=SCREENS.FLASH; break;
       case 'toQuiz':
-      quiz.deck = shuffle([...WORDS]);
-      quiz.idx  = 0;
-      screen = SCREENS.QUIZ;
-      break;
+        quiz.deck = shuffle([...WORDS]);
+        quiz.idx  = 0;
+        screen = SCREENS.QUIZ;
+        break;
       case 'toSnake': screen=SCREENS.SNAKE; startGame(); break;
       case 'backMenu':
         screen = SCREENS.MENU;
-        if (quiz){ quiz.q = null; quiz.locked = false; quiz.total = 0;} // 重置
+        if (quiz){ quiz.q = null; quiz.locked = false; quiz.total = 0; }
         break;
       default:
         if (id.startsWith('quizOpt')){ const idx=+id.replace('quizOpt',''); quizChoose(idx); return; }
-        if (id==='flashFlip') flash.showBack=!flash.showBack;
-        if (id==='flashKnow') { grantXP(5); if (flash.current && !profile.learnedWords.includes(flash.current.en)){ profile.learnedWords.push(flash.current.en); incToday('words',1);} flash.deck.push(flash.deck.shift()); flash.current=flash.deck[0]||null; flash.showBack=false; saveProfile(); }
-        if (id==='flashPractice'){ grantXP(3); flash.deck.push(flash.deck.shift()); flash.current=flash.deck[0]||null; flash.showBack=false; saveProfile(); }
+        if (id==='flashFlip')     flash.showBack=!flash.showBack;
+        if (id==='flashKnow') {
+          grantXP(5);
+          if (flash.current && !profile.learnedWords.includes(flash.current.en)){
+            profile.learnedWords.push(flash.current.en); incToday('words',1);
+          }
+          flash.deck.push(flash.deck.shift());
+          flash.current=flash.deck[0]||null; flash.showBack=false; saveProfile();
+        }
+        if (id==='flashPractice'){
+          grantXP(3);
+          flash.deck.push(flash.deck.shift());
+          flash.current=flash.deck[0]||null; flash.showBack=false; saveProfile();
+        }
     }
     draw();
   }
+
   function draw(){
     switch(screen){
       case SCREENS.MENU:  drawMenu(); break;
@@ -1114,67 +1152,66 @@ if (screen === SCREENS.QUIZ && ['1','2','3','4'].includes(e.key)) {
       case SCREENS.SNAKE: drawSnake(); break;
     }
   }
+
   function tick(now){
-    if (screen===SCREENS.SNAKE && game && game.alive && game.started && !game.paused){ stepGame(now); draw(); }
+    if (screen===SCREENS.SNAKE && game && game.alive && game.started && !game.paused){
+      stepGame(now); draw();
+    }
     if (screen===SCREENS.QUIZ && quiz.q){
       const secs=Math.ceil(timeLeftMs()/1000);
-      if (quiz.lastSecond !== secs){ quiz.lastSecond=secs; if (secs<=3&&secs>0) playSfx('tick'); draw(); }
-
-      // 這裡開始是新的
+      if (quiz.lastSecond !== secs){
+        quiz.lastSecond=secs;
+        if (secs<=3&&secs>0) playSfx('tick');
+        draw();
+      }
       if (timeLeftMs()<=0 && !quiz.locked){
-        quiz.locked = true; // 只處理一次
+        quiz.locked = true;
         quiz.total++;
         quiz.feedback = `⌛ 時間到！正解是「${quiz.q.zh}」`;
         playSfx('bad');
         setTimeout(()=>{ quiz.feedback=''; genQuiz(); draw(); }, 700);
       }
     }
-    
-requestAnimationFrame(tick);         // ← 這行要有
-}                        
+    requestAnimationFrame(tick);
+  }
+
   // ====== Speech ==============================================================
   let preferredVoice = null;
   function pickVoice(){
     try{
       const voices = speechSynthesis.getVoices() || [];
       const prefer=[/Google US English/i,/Samantha/i,/Victoria/i,/Daniel/i,/Karen/i,/Serena/i,/English \(US\)/i];
-      for (const rx of prefer){ const v=voices.find(v=>rx.test(v.name)||rx.test(v.lang)); if(v){ preferredVoice=v; return; } }
+      for (const rx of prefer){
+        const v=voices.find(v=>rx.test(v.name)||rx.test(v.lang));
+        if(v){ preferredVoice=v; return; }
+      }
       preferredVoice = voices[0] || null;
     }catch{}
   }
-  if ('speechSynthesis' in window){ window.speechSynthesis.onvoiceschanged = pickVoice; pickVoice(); }
+  if ('speechSynthesis' in window){
+    window.speechSynthesis.onvoiceschanged = pickVoice;
+    pickVoice();
+  }
   function speakWord(en){
     try{
-      const u=new SpeechSynthesisUtterance(en); u.lang='en-US'; u.rate=0.92+Math.random()*0.12; u.pitch=0.95+Math.random()*0.13;
-      if (preferredVoice) u.voice = preferredVoice; window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
+      const u=new SpeechSynthesisUtterance(en);
+      u.lang='en-US'; u.rate=0.92+Math.random()*0.12; u.pitch=0.95+Math.random()*0.13;
+      if (preferredVoice) u.voice = preferredVoice;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
     }catch{}
   }
 
   // ====== Boot ================================================================
   function init(){
-    resize();
+    doResize();            // 初始尺寸
     initFirebase();
-    loadWords();          // 唯一資料來源：./words.json（失敗則用預設）
-    setMode(currentMode); // 設定時間/速度
+    loadWords();           // 讀 ./words.json（失敗→預設）
+    setMode(currentMode);  // 設定時間/速度
     draw();
     requestAnimationFrame(tick);
     CANVAS.focus();
   }
-  CANVAS.addEventListener('click', (e)=>{
-  const rect = CANVAS.getBoundingClientRect();
-  const x = (e.clientX - rect.left) * DPR;
-  const y = (e.clientY - rect.top)  * DPR;
-
-  if (screen === SCREENS.FLASH && flash.cardRect){
-    const r = flash.cardRect;
-    if (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h){
-      flipCard();
-      return;
-    }
-  }
-  if (!hoverId) return;
-  handleButton(hoverId);
-});
   init();
 })();
 </script>
