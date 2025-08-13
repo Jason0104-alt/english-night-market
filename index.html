@@ -197,10 +197,17 @@ function drawTitle(){
   CTX.fillRect(rectX, rectY, textWidth + paddingX * 2, rectHeight);
   CTX.restore();                      // 還原，讓後面的文字保留陰影
   CTX.fillStyle = COL.white; // 重設回白色
-  CTX.fillText('英語夜市 · English Night Market', x, y1);
-  CTX.lineWidth = 6 * DPR; // 從 4 調成 6
-  CTX.strokeStyle = 'rgba(0,0,0,0.85)'; // 更深的黑
+  // 先畫外框（不要陰影，線條才銳利）
+  CTX.save();
+  CTX.shadowColor = 'transparent';     // 外框不吃陰影
+  CTX.lineWidth   = 6 * DPR;
+  CTX.strokeStyle = 'rgba(0,0,0,0.85)';
   CTX.strokeText('英語夜市 · English Night Market', x, y1);
+  CTX.restore();                       // 還原，讓下面白字仍有陰影
+
+  // 再畫白字（保留陰影；陰影設定沿用你上面 0.55/blur/offset）
+  CTX.fillStyle = COL.white;
+  CTX.fillText('英語夜市 · English Night Market', x, y1);
   
   // 副標：保留較淡的顏色，也加一點陰影
   CTX.font = `${17*DPR}px system-ui`;
