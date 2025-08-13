@@ -169,13 +169,31 @@
       for (let c=0;c<cols;c++){ const t=c/(cols-1); const x=lerp(w*0.05,w*0.95,t); drawLantern(x,y+(r%2?10:-10)*DPR,(r%2?1:0)); }
     }
   }
-  function drawTitle(){
-    CTX.font = `${32*DPR}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
-    CTX.fillStyle=COL.white; CTX.textAlign='center';
-    CTX.fillText('英語夜市 · English Night Market', CANVAS.width/2, topInset()+40*DPR);
-    CTX.font = `${16*DPR}px system-ui`; CTX.fillStyle=COL.faint;
-    CTX.fillText('學英文 · 玩遊戲 · 每日進步', CANVAS.width/2, topInset()+70*DPR);
-  }
+function drawTitle(){
+  CTX.save();
+  const x = CANVAS.width / 2;
+  const y1 = topInset() + 40 * DPR; // 主標
+  const y2 = topInset() + 70 * DPR; // 副標
+
+  CTX.textAlign = 'center';
+
+  // 主標：加陰影、稍微放大
+  CTX.font = `${36*DPR}px ui-sans-serif, system-ui, Segoe UI, Roboto, sans-serif`;
+  CTX.fillStyle = COL.white;
+  CTX.shadowColor = 'rgba(0,0,0,0.55)';
+  CTX.shadowBlur = 10 * DPR;
+  CTX.shadowOffsetY = 2 * DPR;
+  CTX.fillText('英語夜市 · English Night Market', x, y1);
+
+  // 副標：保留較淡的顏色，也加一點陰影
+  CTX.font = `${17*DPR}px system-ui`;
+  CTX.fillStyle = COL.faint;
+  CTX.shadowBlur = 6 * DPR;
+  CTX.shadowOffsetY = 1 * DPR;
+  CTX.fillText('學英文 · 玩遊戲 · 每日進步', x, y2);
+
+  CTX.restore();
+}
 
   // ====== Modes ===============================================================
   const MODES = {
