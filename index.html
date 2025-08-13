@@ -207,6 +207,9 @@ function drawTitle(){
   CTX.save();
   CTX.lineWidth   = 6 * DPR;
   CTX.strokeStyle = 'rgba(0,0,0,0.85)';
+  CTX.lineJoin   = 'round';
+  CTX.lineCap    = 'round';
+  CTX.miterLimit = 2;
   CTX.strokeText('英語夜市 · English Night Market', x, y1);
   CTX.restore();
 
