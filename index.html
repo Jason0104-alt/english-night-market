@@ -184,7 +184,10 @@ function drawTitle(){
   CTX.shadowBlur = 10 * DPR;
   CTX.shadowOffsetY = 2 * DPR;
   CTX.fillText('英語夜市 · English Night Market', x, y1);
-
+  CTX.lineWidth = 4 * DPR;
+  CTX.strokeStyle = 'rgba(0,0,0,0.65)';
+  CTX.strokeText('英語夜市 · English Night Market', x, y1);
+  
   // 副標：保留較淡的顏色，也加一點陰影
   CTX.font = `${17*DPR}px system-ui`;
   CTX.fillStyle = COL.faint;
