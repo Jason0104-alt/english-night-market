@@ -641,6 +641,7 @@ function goalsFor(dateStr){
     const wrongs=shuffle([...WORDS].filter(w=>w.en!==base.en)).slice(0,3);
     quiz.q=base; quiz.options=shuffle([base, ...wrongs]);
     const secs=MODES[currentMode].quizTime; quiz.deadline=performance.now()+secs*1000; quiz.lastSecond=Math.ceil(secs);
+    quiz.locked = false;   // 進新題，解鎖
   }
   function timeLeftMs(){ return Math.max(0, quiz.deadline - performance.now()); }
   function drawQuiz(){
@@ -992,7 +993,10 @@ if (screen === SCREENS.QUIZ && ['1','2','3','4'].includes(e.key)) {
       screen = SCREENS.QUIZ;
       break;
       case 'toSnake': screen=SCREENS.SNAKE; startGame(); break;
-      case 'backMenu': screen=SCREENS.MENU; break;
+      case 'backMenu':
+        screen = SCREENS.MENU;
+        if (quiz){ quiz.q = null; quiz.locked = false; quiz.total = 0;} // 重置
+        break;
       default:
         if (id.startsWith('quizOpt')){ const idx=+id.replace('quizOpt',''); quizChoose(idx); return; }
         if (id==='flashFlip') flash.showBack=!flash.showBack;
@@ -1015,11 +1019,19 @@ if (screen === SCREENS.QUIZ && ['1','2','3','4'].includes(e.key)) {
     if (screen===SCREENS.QUIZ && quiz.q){
       const secs=Math.ceil(timeLeftMs()/1000);
       if (quiz.lastSecond !== secs){ quiz.lastSecond=secs; if (secs<=3&&secs>0) playSfx('tick'); draw(); }
-      if (timeLeftMs()<=0){ quiz.total++; quiz.feedback=`⌛ 時間到！正解是「${quiz.q.zh}」`; playSfx('bad'); setTimeout(()=>{ quiz.feedback=''; genQuiz(); draw(); }, 700); }
-    }
-    requestAnimationFrame(tick);
-  }
 
+      // 這裡開始是新的
+      if (timeLeftMs()<=0 && !quiz.locked){
+        quiz.locked = true; // 只處理一次
+        quiz.total++;
+        quiz.feedback = `⌛ 時間到！正解是「${quiz.q.zh}」`;
+        playSfx('bad');
+        setTimeout(()=>{ quiz.feedback=''; genQuiz(); draw(); }, 700);
+      }
+    }
+    
+requestAnimationFrame(tick);         // ← 這行要有
+}                        
   // ====== Speech ==============================================================
   let preferredVoice = null;
   function pickVoice(){
