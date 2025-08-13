@@ -193,6 +193,7 @@ function drawTitle(){
 
   CTX.fillStyle = 'rgba(0, 0, 0, 0.4)';
   CTX.fillRect(rectX, rectY, textWidth + paddingX * 2, rectHeight);
+  CTX.fillStyle = COL.white; // 重設回白色
   CTX.fillText('英語夜市 · English Night Market', x, y1);
   CTX.lineWidth = 6 * DPR; // 從 4 調成 6
   CTX.strokeStyle = 'rgba(0,0,0,0.85)'; // 更深的黑
