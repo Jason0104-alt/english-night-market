@@ -183,9 +183,19 @@ function drawTitle(){
   CTX.shadowColor = 'rgba(0,0,0,0.55)';
   CTX.shadowBlur = 10 * DPR;
   CTX.shadowOffsetY = 2 * DPR;
+  
+  const paddingX = 20 * DPR;
+  const paddingY = 10 * DPR;
+  const textWidth = CTX.measureText('英語夜市 · English Night Market').width;
+  const rectX = x - textWidth / 2 - paddingX;
+  const rectY = y1 - 36 * DPR; // 上方留白
+  const rectHeight = 50 * DPR;
+
+  CTX.fillStyle = 'rgba(0, 0, 0, 0.4)';
+  CTX.fillRect(rectX, rectY, textWidth + paddingX * 2, rectHeight);
   CTX.fillText('英語夜市 · English Night Market', x, y1);
-  CTX.lineWidth = 4 * DPR;
-  CTX.strokeStyle = 'rgba(0,0,0,0.65)';
+  CTX.lineWidth = 6 * DPR; // 從 4 調成 6
+  CTX.strokeStyle = 'rgba(0,0,0,0.85)'; // 更深的黑
   CTX.strokeText('英語夜市 · English Night Market', x, y1);
   
   // 副標：保留較淡的顏色，也加一點陰影
