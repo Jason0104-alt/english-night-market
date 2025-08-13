@@ -180,9 +180,9 @@ function drawTitle(){
   // 主標：加陰影、稍微放大
   CTX.font = `${36*DPR}px ui-sans-serif, system-ui, Segoe UI, Roboto, sans-serif`;
   CTX.fillStyle = COL.white;
-  CTX.shadowColor = 'rgba(0,0,0,0.55)';
-  CTX.shadowBlur = 10 * DPR;
-  CTX.shadowOffsetY = 2 * DPR;
+  //CTX.shadowColor = 'rgba(0,0,0,0.55)';
+  //CTX.shadowBlur = 10 * DPR;
+  //CTX.shadowOffsetY = 2 * DPR;
   
   const paddingX = 20 * DPR;
   const paddingY = 10 * DPR;
@@ -197,15 +197,20 @@ function drawTitle(){
   CTX.fillRect(rectX, rectY, textWidth + paddingX * 2, rectHeight);
   CTX.restore();                      // 還原，讓後面的文字保留陰影
   CTX.fillStyle = COL.white; // 重設回白色
-  // 先畫外框（不要陰影，線條才銳利）
+  // 先畫一層假陰影（半透明黑字往下 2px）
   CTX.save();
-  CTX.shadowColor = 'transparent';     // 外框不吃陰影
+  CTX.fillStyle = 'rgba(0,0,0,0.38)';
+  CTX.fillText('英語夜市 · English Night Market', x, y1 + 2 * DPR);
+  CTX.restore();
+
+  // 再畫外框（不要陰影）
+  CTX.save();
   CTX.lineWidth   = 6 * DPR;
   CTX.strokeStyle = 'rgba(0,0,0,0.85)';
   CTX.strokeText('英語夜市 · English Night Market', x, y1);
-  CTX.restore();                       // 還原，讓下面白字仍有陰影
+  CTX.restore();
 
-  // 再畫白字（保留陰影；陰影設定沿用你上面 0.55/blur/offset）
+  // 最後畫白字（本體）
   CTX.fillStyle = COL.white;
   CTX.fillText('英語夜市 · English Night Market', x, y1);
   
