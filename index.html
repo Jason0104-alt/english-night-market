@@ -558,6 +558,20 @@ function goalsFor(dateStr){
 
   // ====== Flash / Quiz ========================================================
   function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [a[i],a[j]]=[a[j],a[i]]; } return a; }
+  function nextQuizWord(){
+  // 沒有 deck（理論上不會），就退回用 nextWord()
+  if (!quiz || !Array.isArray(quiz.deck) || !quiz.deck.length) return nextWord();
+
+  const i = quiz.idx % quiz.deck.length;
+  const w = quiz.deck[i];
+  quiz.idx++;
+
+  // 每輪用完一次 deck，就重新洗牌，確保下一輪順序不同
+  if (quiz.idx % quiz.deck.length === 0){
+    quiz.deck = shuffle([...quiz.deck]);
+  }
+  return w;
+}
   function nextWord(){
     if (!WORDS.length) return {en:'loading…', zh:'載入中…'};
     const w = WORDS[wordIndex % WORDS.length]; wordIndex++; return w;
@@ -620,10 +634,10 @@ function goalsFor(dateStr){
     CTX.restore();
   }
 
-  let quiz = { q:null, options:[], correct:0, total:0, feedback:'', deadline:0, lastSecond:null };
+  let quiz  = { deck: shuffle([...WORDS]), idx: 0, q:null, options:[], correct:0, total:0, feedback:'', deadline:0, lastSecond:null };
   function genQuiz(){
     if (!WORDS.length){ quiz.q=null; return; }
-    const base=nextWord();
+    const base = nextQuizWord();
     const wrongs=shuffle([...WORDS].filter(w=>w.en!==base.en)).slice(0,3);
     quiz.q=base; quiz.options=shuffle([base, ...wrongs]);
     const secs=MODES[currentMode].quizTime; quiz.deadline=performance.now()+secs*1000; quiz.lastSecond=Math.ceil(secs);
@@ -972,7 +986,11 @@ if (screen === SCREENS.QUIZ && ['1','2','3','4'].includes(e.key)) {
     switch(id){
       case 'toDash': screen=SCREENS.DASH; break;
       case 'toFlash': screen=SCREENS.FLASH; break;
-      case 'toQuiz': screen=SCREENS.QUIZ; break;
+      case 'toQuiz':
+      quiz.deck = shuffle([...WORDS]);
+      quiz.idx  = 0;
+      screen = SCREENS.QUIZ;
+      break;
       case 'toSnake': screen=SCREENS.SNAKE; startGame(); break;
       case 'backMenu': screen=SCREENS.MENU; break;
       default:
