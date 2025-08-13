@@ -436,7 +436,38 @@ function getRecentScores(n = 7){
   }
   return out;
 }
+// ====== Daily Missions (auto-tuned by recent performance) ====================
+const GOAL_KEY = 'nm_goals_v1';
+function goalsFor(dateStr){
+  // 1) 同一天重整頁面，沿用同一組目標（不會越玩越調高）
+  try{
+    const saved = JSON.parse(localStorage.getItem(GOAL_KEY) || '{}');
+    if (saved.date === dateStr && saved.goals) return saved.goals;
+  }catch{}
 
+  // 2) 看「前 3 天」平均，稍微加 20% 當作今天目標
+  let xp=0, words=0, games=0, n=0;
+  const d = new Date(dateStr);
+  for(let i=1;i<=3;i++){
+    const t = new Date(d); t.setDate(d.getDate()-i);
+    const key = t.toISOString().slice(0,10);
+    const row = (profile.daily && profile.daily[key]) || null;
+    if (row){ xp+=(row.xp||0); words+=(row.words||0); games+=(row.games||0); n++; }
+  }
+
+  const axp    = n ? xp/n     : 20; // 沒資料就給保守值
+  const awords = n ? words/n  : 6;
+  const agames = n ? games/n  : 1;
+
+  const goals = {
+    xp:     clamp(Math.round((axp   *1.2)/10)*10, 20, 200), // 十位數、20~200
+    words:  clamp(Math.round(awords*1.2)       ,  5,  20),  // 5~20 字
+    games:  clamp(Math.round(agames*1.2)       ,  1,   5)   // 1~5 局
+  };
+
+  localStorage.setItem(GOAL_KEY, JSON.stringify({ date: dateStr, goals }));
+  return goals;
+}
   // ====== Words / Topic / Level ==============================================
   // 只讀 ./words.json；若沒讀到，用較完整的預設資料（多 Topic、多等級），避免只剩 apple
   let TOPICS = {};
@@ -783,8 +814,10 @@ function getRecentScores(n = 7){
     ];
     const rectW = Math.min(w*0.72, 740*DPR), rectH = 68*DPR;
     B.forEach(b=>{ const rect={x:w/2-rectW/2,y:b.y-rectH/2,w:rectW,h:rectH}; buttons[b.id]=rect; drawButton(b.id,rect,b.label,b.sub); });
-    const today = profile.daily[TODAY()] || {xp:0}; const pct = clamp((today.xp||0)/100,0,1);
-    drawProgressRing(w*0.85, sectionTop - 50*DPR, 48*DPR, pct, `今日XP ${today.xp||0}/100`);
+    const today = profile.daily[TODAY()] || { xp: 0 };
+    const goals = goalsFor(TODAY());
+    const pct   = clamp((today.xp || 0) / goals.xp, 0, 1);
+    drawProgressRing(w*0.85, sectionTop - 50*DPR, 48*DPR, pct, `今日XP ${today.xp || 0}/${goals.xp}`);
   }
   function shortenNumber(num) {
   if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
@@ -803,10 +836,11 @@ function getRecentScores(n = 7){
     }
     const today = profile.daily[TODAY()] || {xp:0,words:0,games:0};
     const ww=Math.min(w*0.36,520*DPR), hh=160*DPR;
+    const goals = goalsFor(TODAY());
     card(w*0.30,startY,ww,hh,'今日任務',[
-      `完成 30 XP：${today.xp>=30?'✅ 完成':'⬜ 進行中'}`,
-      `學 10 字：${today.words>=10?'✅ 完成':`⬜ ${today.words||0}/10`}`,
-      `玩阿嬤買菜 1 局：${today.games>=1?'✅ 完成':'⬜ 尚未'}`
+      `完成 ${goals.xp} XP：${today.xp>=goals.xp ? '✅ 完成' : `⬜ ${today.xp||0}/${goals.xp}`}`,
+      `學 ${goals.words} 字：${today.words>=goals.words ? '✅ 完成' : `⬜ ${today.words||0}/${goals.words}`}`,
+      `玩阿嬤買菜 ${goals.games} 局：${today.games>=goals.games ? '✅ 完成' : `⬜ ${today.games||0}/${goals.games}`}`
     ]);
     card(w*0.70,startY,ww,hh,'總覽',[
       `註冊日期：${profile.createdAt}`,
