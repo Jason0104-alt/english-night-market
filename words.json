@@ -241,7 +241,7 @@
     {"en":"stairs","zh":"樓梯","level":"easy"},
     {"en":"elevator","zh":"電梯","level":"easy"},
     {"en":"escalator","zh":"手扶梯","level":"easy"},
-    {"en":"balcony","zh":"陽台","level":"easy"}
+    {"en":"balcony","zh":"陽台","level":"easy"},
     {"en":"porch","zh":"門廊","level":"easy"},
     {"en":"chimney","zh":"煙囪","level":"easy"},
     {"en":"window sill","zh":"窗台","level":"easy"},
@@ -361,7 +361,7 @@
     {"en":"remote control","zh":"遙控器","level":"easy"},
     {"en":"microphone","zh":"麥克風","level":"easy"},
     {"en":"speaker","zh":"喇叭","level":"easy"},
-    {"en":"headphones","zh":"耳機","level":"easy"}
+    {"en":"headphones","zh":"耳機","level":"easy"},
     {"en":"earbuds","zh":"耳塞式耳機","level":"easy"},
     {"en":"charger","zh":"充電器","level":"easy"},
     {"en":"cable","zh":"電線","level":"easy"},
@@ -484,7 +484,7 @@
     {"en":"bridge arch","zh":"拱橋","level":"easy"},
     {"en":"lighthouse","zh":"燈塔","level":"easy"},
     {"en":"windmill","zh":"風車","level":"easy"},
-    {"en":"waterfall","zh":"瀑布","level":"easy"}
+    {"en":"waterfall","zh":"瀑布","level":"easy"},
     {"en":"stream","zh":"小溪","level":"easy"},
     {"en":"pond","zh":"池塘","level":"easy"},
     {"en":"cliff","zh":"懸崖","level":"easy"},
@@ -811,7 +811,7 @@
 {"en":"banner","zh":"橫幅","level":"normal"},
 {"en":"sign","zh":"招牌","level":"normal"},
 {"en":"label","zh":"標籤","level":"normal"},
-{"en":"price tag","zh":"價格標籤","level":"normal"}
+{"en":"price tag","zh":"價格標籤","level":"normal"},
 {"en":"billboard","zh":"廣告牌","level":"normal"},
 {"en":"menu","zh":"菜單","level":"normal"},
 {"en":"brochure","zh":"小冊子","level":"normal"},
@@ -963,7 +963,7 @@
 {"en":"centerpiece","zh":"餐桌擺飾","level":"normal"},
 {"en":"candlestick","zh":"燭台","level":"normal"},
 {"en":"oil lamp","zh":"油燈","level":"normal"},
-{"en":"lantern","zh":"燈籠","level":"normal"}
+{"en":"lantern","zh":"燈籠","level":"normal"},
 {"en":"flashlight","zh":"手電筒","level":"normal"},
 {"en":"torch","zh":"火把","level":"normal"},
 {"en":"headlamp","zh":"頭燈","level":"normal"},
@@ -2074,8 +2074,7 @@
     {"en":"business-class cabin","zh":"商務艙","level":"hard"},
     {"en":"economy class","zh":"經濟艙","level":"hard"},
     {"en":"seat recline","zh":"座椅後仰","level":"hard"},
-    {"en":"in-flight entertainment","zh":"機上娛樂","level":"hard"},
-    
+    {"en":"in-flight entertainment","zh":"機上娛樂","level":"hard"}
 ],
   
   "Food & Drinks": [
