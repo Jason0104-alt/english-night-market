@@ -191,8 +191,11 @@ function drawTitle(){
   const rectY = y1 - 36 * DPR; // 上方留白
   const rectHeight = 50 * DPR;
 
+  CTX.save();                         // 關掉陰影，只給背景矩形用
+  CTX.shadowColor = 'transparent';
   CTX.fillStyle = 'rgba(0, 0, 0, 0.4)';
   CTX.fillRect(rectX, rectY, textWidth + paddingX * 2, rectHeight);
+  CTX.restore();                      // 還原，讓後面的文字保留陰影
   CTX.fillStyle = COL.white; // 重設回白色
   CTX.fillText('英語夜市 · English Night Market', x, y1);
   CTX.lineWidth = 6 * DPR; // 從 4 調成 6
